@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard: {{ contest.contest_name }} - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="bi bi-trophy"></i> Leaderboard</h2>
+                    <h4 class="text-muted">{{ contest.contest_name }}</h4>
+                </div>
+                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Contest
+                </a>
+            </div>
+
+            <div class="row">
+                <!-- Leaderboard -->
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-list-ol"></i> Final Results</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if leaderboard %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Participant</th>
+                                            <th>Score</th>
+                                            <th>Accuracy</th>
+                                            <th>Entry Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in leaderboard %}
+                                        <tr class="{% if loop.index <= 3 %}table-warning{% endif %}">
+                                            <td>
+                                                <strong>
+                                                    {% if loop.index == 1 %}
+                                                    <i class="bi bi-trophy-fill text-warning"></i> 1st
+                                                    {% elif loop.index == 2 %}
+                                                    <i class="bi bi-award-fill text-secondary"></i> 2nd
+                                                    {% elif loop.index == 3 %}
+                                                    <i class="bi bi-award text-warning"></i> 3rd
+                                                    {% else %}
+                                                    {{ loop.index }}
+                                                    {% endif %}
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                <strong>{{ entry.user.get_display_name() }}</strong>
+                                                {% if current_user and entry.user_id == current_user.user_id %}
+                                                <span class="badge bg-primary ms-2">You</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success fs-6">{{ entry.score }}</span>
+                                                <small class="text-muted">/ {{ questions|length }}</small>
+                                            </td>
+                                            <td>
+                                                {% set accuracy = (entry.score / questions|length * 100) if questions|length > 0 else 0 %}
+                                                <div class="progress" style="width: 100px; height: 20px;">
+                                                    {% if accuracy >= 80 %}
+                                                    <div class="progress-bar bg-success" 
+                                                         role="progressbar" 
+                                                         style="width: {{ accuracy }}%"
+                                                         aria-valuenow="{{ accuracy }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ "%.0f"|format(accuracy) }}%
+                                                    </div>
+                                                    {% elif accuracy >= 60 %}
+                                                    <div class="progress-bar bg-warning" 
+                                                         role="progressbar" 
+                                                         style="width: {{ accuracy }}%"
+                                                         aria-valuenow="{{ accuracy }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ "%.0f"|format(accuracy) }}%
+                                                    </div>
+                                                    {% else %}
+                                                    <div class="progress-bar bg-danger" 
+                                                         role="progressbar" 
+                                                         style="width: {{ accuracy }}%"
+                                                         aria-valuenow="{{ accuracy }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100">
+                                                        {{ "%.0f"|format(accuracy) }}%
+                                                    </div>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <small>{{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else 'Unknown' }}</small>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-people display-1 text-muted mb-3"></i>
+                                <h5 class="text-muted">No Entries</h5>
+                                <p class="text-muted">No one has entered this contest yet.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contest Info & Questions -->
+                <div class="col-lg-4">
+                    <!-- Contest Summary -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Contest Summary</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Total Questions:</strong> {{ questions|length }}</p>
+                            <p><strong>Total Entries:</strong> {{ leaderboard|length }}</p>
+                            <p><strong>Contest Locked:</strong><br>
+                            <small>{{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') if contest.lock_timestamp else 'Unknown' }}</small>
+                            </p>
+                            {% if contest.description %}
+                            <p><strong>Description:</strong><br>
+                            <small>{{ contest.description }}</small>
+                            </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Top 3 Podium -->
+                    {% if leaderboard|length >= 3 %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-trophy"></i> Top 3</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center">
+                                <!-- 2nd Place -->
+                                <div class="d-inline-block mx-2">
+                                    <div class="bg-secondary text-white rounded p-3 mb-2" style="height: 80px; width: 80px; display: flex; align-items: center; justify-content: center;">
+                                        <div>
+                                            <i class="bi bi-award-fill"></i><br>
+                                            <small>2nd</small>
+                                        </div>
+                                    </div>
+                                    <div><small><strong>{{ leaderboard[1].user.get_display_name() }}</strong></small></div>
+                                    <div><small>{{ leaderboard[1].score }} pts</small></div>
+                                </div>
+
+                                <!-- 1st Place -->
+                                <div class="d-inline-block mx-2">
+                                    <div class="bg-warning text-dark rounded p-3 mb-2" style="height: 100px; width: 80px; display: flex; align-items: center; justify-content: center;">
+                                        <div>
+                                            <i class="bi bi-trophy-fill"></i><br>
+                                            <small>1st</small>
+                                        </div>
+                                    </div>
+                                    <div><small><strong>{{ leaderboard[0].user.get_display_name() }}</strong></small></div>
+                                    <div><small>{{ leaderboard[0].score }} pts</small></div>
+                                </div>
+
+                                <!-- 3rd Place -->
+                                <div class="d-inline-block mx-2">
+                                    <div class="bg-warning text-dark rounded p-3 mb-2" style="height: 60px; width: 80px; display: flex; align-items: center; justify-content: center;">
+                                        <div>
+                                            <i class="bi bi-award"></i><br>
+                                            <small>3rd</small>
+                                        </div>
+                                    </div>
+                                    <div><small><strong>{{ leaderboard[2].user.get_display_name() }}</strong></small></div>
+                                    <div><small>{{ leaderboard[2].score }} pts</small></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Questions & Answers -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-question-circle"></i> Questions & Correct Answers</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if questions %}
+                            <div class="list-group list-group-flush">
+                                {% for question in questions %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">Q{{ question.question_order }}</h6>
+                                            <p class="mb-1 small">{{ question.question_text }}</p>
+                                        </div>
+                                        {% if question.has_answer() %}
+                                            {% if question.correct_answer %}
+                                            <span class="badge bg-success ms-2">Yes</span>
+                                            {% else %}
+                                            <span class="badge bg-danger ms-2">No</span>
+                                            {% endif %}
+                                        {% else %}
+                                        <span class="badge bg-secondary ms-2">Not Set</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No questions in this contest.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

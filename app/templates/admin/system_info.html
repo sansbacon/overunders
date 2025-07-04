@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}System Information - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>System Information</h2>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Database Statistics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Database Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-2">
+                            <div class="border-end">
+                                <h3 class="text-primary">{{ db_stats.users }}</h3>
+                                <small class="text-muted">Users</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="border-end">
+                                <h3 class="text-success">{{ db_stats.contests }}</h3>
+                                <small class="text-muted">Contests</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="border-end">
+                                <h3 class="text-info">{{ db_stats.questions }}</h3>
+                                <small class="text-muted">Questions</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="border-end">
+                                <h3 class="text-warning">{{ db_stats.entries }}</h3>
+                                <small class="text-muted">Entries</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="border-end">
+                                <h3 class="text-secondary">{{ db_stats.answers }}</h3>
+                                <small class="text-muted">Answers</small>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <h3 class="text-dark">{{ db_stats.login_tokens }}</h3>
+                            <small class="text-muted">Login Tokens</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Maintenance -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">System Maintenance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-key text-warning"></i> Login Token Cleanup
+                                    </h6>
+                                    <p class="card-text">
+                                        Clean up expired login tokens to maintain database performance.
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-danger">{{ db_stats.expired_tokens }}</span>
+                                            <small class="text-muted">expired tokens</small>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('admin.cleanup_tokens') }}" style="display: inline;">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-warning btn-sm">
+                                                <i class="fas fa-broom"></i> Cleanup Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="fas fa-database text-info"></i> Database Health
+                                    </h6>
+                                    <p class="card-text">
+                                        Monitor database performance and integrity.
+                                    </p>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge bg-success">Healthy</span>
+                                            <small class="text-muted">status</small>
+                                        </div>
+                                        <button type="button" class="btn btn-info btn-sm" disabled>
+                                            <i class="fas fa-chart-line"></i> View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Application Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Application Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Application Name:</strong></td>
+                                        <td>Over-Under Contests</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Version:</strong></td>
+                                        <td>1.0.0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Environment:</strong></td>
+                                        <td>
+                                            <span class="badge bg-primary">Development</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Database:</strong></td>
+                                        <td>SQLite</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td><strong>Flask Version:</strong></td>
+                                        <td>{{ config.get('FLASK_VERSION', 'Unknown') }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Python Version:</strong></td>
+                                        <td>{{ config.get('PYTHON_VERSION', 'Unknown') }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Debug Mode:</strong></td>
+                                        <td>
+                                            {% if config.get('DEBUG') %}
+                                            <span class="badge bg-warning">Enabled</span>
+                                            {% else %}
+                                            <span class="badge bg-success">Disabled</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Secret Key Set:</strong></td>
+                                        <td>
+                                            {% if config.get('SECRET_KEY') %}
+                                            <span class="badge bg-success">Yes</span>
+                                            {% else %}
+                                            <span class="badge bg-danger">No</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">System Logs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> System logging is not yet implemented. This section would typically 
+                        show recent application events, errors, and administrative actions.
+                    </div>
+                    
+                    <div class="text-center py-4">
+                        <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No logs available</h5>
+                        <p class="text-muted">System logging will be implemented in a future version.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

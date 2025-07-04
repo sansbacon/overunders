@@ -1,0 +1,28 @@
+{
+  "contest_name": "Weather Predictions Contest",
+  "description": "Predict various weather conditions for the upcoming week",
+  "lock_timestamp": "2025-01-20T18:00:00",
+  "is_active": true,
+  "questions": [
+    {
+      "question_text": "Will the temperature exceed 75°F on Monday?",
+      "question_order": 1
+    },
+    {
+      "question_text": "Will it rain on Tuesday?",
+      "question_order": 2
+    },
+    {
+      "question_text": "Will the wind speed exceed 15 mph on Wednesday?",
+      "question_order": 3
+    },
+    {
+      "question_text": "Will there be snow on Thursday?",
+      "question_order": 4
+    },
+    {
+      "question_text": "Will Friday be sunny all day?",
+      "question_order": 5
+    }
+  ]
+}

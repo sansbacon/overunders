@@ -1,0 +1,377 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">{{ title }}</h4>
+                        <a href="{{ url_for('contests.list_contests') }}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Back to Contests
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="contest-form">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Contest Basic Info -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2">Contest Information</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.contest_name.label(class="form-label") }}
+                                {{ form.contest_name(class="form-control" + (" is-invalid" if form.contest_name.errors else "")) }}
+                                {% if form.contest_name.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.contest_name.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                {{ form.description.label(class="form-label") }}
+                                {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), rows="3") }}
+                                {% if form.description.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.description.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">Optional description of the contest</div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        {{ form.lock_timestamp.label(class="form-label") }}
+                                        {{ form.lock_timestamp(class="form-control" + (" is-invalid" if form.lock_timestamp.errors else "")) }}
+                                        {% if form.lock_timestamp.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.lock_timestamp.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Date and time when the contest will be locked</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.timezone.label(class="form-label") }}
+                                        {{ form.timezone(class="form-select" + (" is-invalid" if form.timezone.errors else "")) }}
+                                        {% if form.timezone.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.timezone.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Your timezone</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Questions Section -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                <h5 class="mb-0">Questions</h5>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="add-question">
+                                    <i class="bi bi-plus-circle"></i> Add Question
+                                </button>
+                            </div>
+                            
+                            <!-- Info about answers -->
+                            <div class="alert alert-info mb-3">
+                                <i class="bi bi-info-circle"></i> 
+                                <strong>Note:</strong> You'll set the correct answers after the contest is locked and the events have concluded. 
+                                For now, just add your Yes/No questions.
+                            </div>
+                            
+                            <div id="questions-container">
+                                {% for question_form in form.questions %}
+                                <div class="question-item card mb-3">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start mb-3">
+                                            <h6 class="card-title mb-0">Question {{ loop.index }}</h6>
+                                            <button type="button" class="btn btn-outline-danger btn-sm remove-question" 
+                                                    {% if loop.index == 1 and form.questions|length == 1 %}style="display: none;"{% endif %}>
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Question</label>
+                                            <input type="text" 
+                                                   class="form-control{% if question_form.question_text.errors %} is-invalid{% endif %}"
+                                                   name="{{ question_form.question_text.name }}"
+                                                   id="{{ question_form.question_text.id }}"
+                                                   value="{{ question_form.question_text.data or '' }}"
+                                                   maxlength="500"
+                                                   required>
+                                            {% if question_form.question_text.errors %}
+                                            <div class="invalid-feedback">
+                                                {% for error in question_form.question_text.errors %}{{ error }}{% endfor %}
+                                            </div>
+                                            {% endif %}
+                                            <div class="form-text">Enter a Yes/No question about a future event</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            {% if not form.questions %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> Click "Add Question" to start adding questions to your contest.
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('contests.list_contests') }}" class="btn btn-secondary">Cancel</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Question Template (hidden) -->
+<div id="question-template" style="display: none;">
+    <div class="question-item card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <h6 class="card-title mb-0">Question <span class="question-number"></span></h6>
+                <button type="button" class="btn btn-outline-danger btn-sm remove-question">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Question</label>
+                <input type="text" class="form-control" name="questions-__INDEX__-question_text" maxlength="500" required>
+                <div class="form-text">Enter a Yes/No question about a future event</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let questionIndex = parseInt('{{ form.questions|length if form.questions else 0 }}');
+    
+    // Auto-save functionality
+    const STORAGE_KEY = 'contest_form_data';
+    
+    function saveFormData() {
+        const formData = {
+            contest_name: document.querySelector('input[name="contest_name"]').value,
+            description: document.querySelector('textarea[name="description"]').value,
+            lock_timestamp: document.querySelector('input[name="lock_timestamp"]').value,
+            timezone: document.querySelector('select[name="timezone"]').value,
+            questions: []
+        };
+        
+        // Save all questions
+        const questionInputs = document.querySelectorAll('.question-item input[type="text"]');
+        questionInputs.forEach(input => {
+            if (input.value.trim()) {
+                formData.questions.push(input.value.trim());
+            }
+        });
+        
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
+    }
+    
+    function loadFormData() {
+        const savedData = localStorage.getItem(STORAGE_KEY);
+        if (!savedData) return;
+        
+        try {
+            const formData = JSON.parse(savedData);
+            
+            // Only restore if form is empty (new contest creation)
+            const isNewForm = !document.querySelector('input[name="contest_name"]').value &&
+                             !document.querySelector('textarea[name="description"]').value;
+            
+            if (isNewForm && formData.contest_name) {
+                // Restore basic fields
+                document.querySelector('input[name="contest_name"]').value = formData.contest_name || '';
+                document.querySelector('textarea[name="description"]').value = formData.description || '';
+                document.querySelector('input[name="lock_timestamp"]').value = formData.lock_timestamp || '';
+                document.querySelector('select[name="timezone"]').value = formData.timezone || 'US/Central';
+                
+                // Restore questions
+                if (formData.questions && formData.questions.length > 0) {
+                    // Clear existing questions first
+                    const container = document.getElementById('questions-container');
+                    container.innerHTML = '';
+                    questionIndex = 0;
+                    
+                    // Add saved questions
+                    formData.questions.forEach(questionText => {
+                        addQuestionWithText(questionText);
+                    });
+                    
+                    updateQuestionNumbers();
+                    updateRemoveButtons();
+                }
+            }
+        } catch (e) {
+            console.error('Error loading saved form data:', e);
+        }
+    }
+    
+    function addQuestionWithText(questionText = '') {
+        const template = document.getElementById('question-template');
+        const container = document.getElementById('questions-container');
+        
+        // Clone the template
+        const newQuestion = template.cloneNode(true);
+        newQuestion.style.display = 'block';
+        newQuestion.id = '';
+        
+        // Update input names and IDs
+        const inputs = newQuestion.querySelectorAll('input');
+        inputs.forEach(input => {
+            const name = input.getAttribute('name');
+            if (name) {
+                input.setAttribute('name', name.replace('__INDEX__', questionIndex));
+                input.setAttribute('id', name.replace('__INDEX__', questionIndex));
+                if (questionText) {
+                    input.value = questionText;
+                }
+            }
+        });
+        
+        // Add to container
+        container.appendChild(newQuestion);
+        questionIndex++;
+    }
+    
+    function clearSavedData() {
+        localStorage.removeItem(STORAGE_KEY);
+    }
+    
+    // Load saved data on page load
+    loadFormData();
+    
+    // Auto-save on input changes
+    document.addEventListener('input', function(e) {
+        if (e.target.closest('#contest-form')) {
+            saveFormData();
+        }
+    });
+    
+    // Clear saved data on successful form submission
+    document.getElementById('contest-form').addEventListener('submit', function(e) {
+        // Only clear if form validation passes
+        setTimeout(() => {
+            const questions = document.querySelectorAll('.question-item input[type="text"]');
+            let hasValidQuestion = false;
+            
+            questions.forEach(input => {
+                if (input.value.trim()) {
+                    hasValidQuestion = true;
+                }
+            });
+            
+            if (hasValidQuestion) {
+                clearSavedData();
+            }
+        }, 100);
+    });
+    
+    // Add question functionality
+    document.getElementById('add-question').addEventListener('click', function() {
+        const template = document.getElementById('question-template');
+        const container = document.getElementById('questions-container');
+        
+        // Clone the template
+        const newQuestion = template.cloneNode(true);
+        newQuestion.style.display = 'block';
+        newQuestion.id = '';
+        
+        // Update input names and IDs
+        const inputs = newQuestion.querySelectorAll('input');
+        inputs.forEach(input => {
+            const name = input.getAttribute('name');
+            if (name) {
+                input.setAttribute('name', name.replace('__INDEX__', questionIndex));
+                input.setAttribute('id', name.replace('__INDEX__', questionIndex));
+            }
+        });
+        
+        // Add to container
+        container.appendChild(newQuestion);
+        questionIndex++;
+        
+        // Update question numbers for all questions
+        updateQuestionNumbers();
+        
+        // Update remove button visibility
+        updateRemoveButtons();
+    });
+    
+    // Remove question functionality
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.remove-question')) {
+            e.target.closest('.question-item').remove();
+            updateQuestionNumbers();
+            updateRemoveButtons();
+        }
+    });
+    
+    function updateQuestionNumbers() {
+        const questions = document.querySelectorAll('.question-item');
+        questions.forEach((question, index) => {
+            const title = question.querySelector('h6.card-title');
+            if (title) {
+                // Always set the title to have consistent format
+                title.innerHTML = 'Question <span class="question-number">' + (index + 1) + '</span>';
+            }
+        });
+    }
+    
+    function updateRemoveButtons() {
+        const questions = document.querySelectorAll('.question-item');
+        const removeButtons = document.querySelectorAll('.remove-question');
+        
+        // Hide remove button if only one question
+        if (questions.length <= 1) {
+            removeButtons.forEach(btn => btn.style.display = 'none');
+        } else {
+            removeButtons.forEach(btn => btn.style.display = 'inline-block');
+        }
+    }
+    
+    // Initial setup
+    updateQuestionNumbers();
+    updateRemoveButtons();
+    
+    // Form validation
+    document.getElementById('contest-form').addEventListener('submit', function(e) {
+        const questions = document.querySelectorAll('.question-item input[type="text"]');
+        let hasValidQuestion = false;
+        
+        questions.forEach(input => {
+            if (input.value.trim()) {
+                hasValidQuestion = true;
+            }
+        });
+        
+        if (!hasValidQuestion) {
+            e.preventDefault();
+            alert('Please add at least one question to your contest.');
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

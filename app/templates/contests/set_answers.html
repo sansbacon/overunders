@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Set Answers: {{ contest.contest_name }} - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="bi bi-check-circle"></i> Set Correct Answers</h2>
+                    <h4 class="text-muted">{{ contest.contest_name }}</h4>
+                </div>
+                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Contest
+                </a>
+            </div>
+
+            <!-- Instructions -->
+            <div class="alert alert-info mb-4">
+                <h6><i class="bi bi-info-circle"></i> Instructions</h6>
+                <p class="mb-0">
+                    Set the correct answers for each question based on the actual outcomes of the events. 
+                    Once you set the answers, scores will be automatically calculated for all participants.
+                </p>
+            </div>
+
+            <!-- Answer Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-question-circle"></i> Contest Questions</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="answersForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        {% for question in questions %}
+                        <div class="question-item mb-4 p-3 border rounded">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="mb-2">Question {{ question.question_order }}</h6>
+                                    <p class="mb-3">{{ question.question_text }}</p>
+                                    
+                                    {% if question.has_answer() %}
+                                    <div class="alert alert-success py-2">
+                                        <small>
+                                            <i class="bi bi-check-circle"></i> 
+                                            Answer set: <strong>{{ 'Yes' if question.correct_answer else 'No' }}</strong>
+                                            {% if question.answer_set_at %}
+                                            on {{ question.answer_set_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                    {% else %}
+                                    <div class="alert alert-warning py-2">
+                                        <small><i class="bi bi-exclamation-triangle"></i> Answer not set yet</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label"><strong>Correct Answer:</strong></label>
+                                    <div class="btn-group w-100" role="group" aria-label="Answer options">
+                                        <input type="radio" 
+                                               class="btn-check" 
+                                               name="question_{{ question.question_id }}" 
+                                               id="yes_{{ question.question_id }}" 
+                                               value="True"
+                                               {% if question.correct_answer == True %}checked{% endif %}>
+                                        <label class="btn btn-outline-success" for="yes_{{ question.question_id }}">
+                                            <i class="bi bi-check-lg"></i> Yes
+                                        </label>
+
+                                        <input type="radio" 
+                                               class="btn-check" 
+                                               name="question_{{ question.question_id }}" 
+                                               id="no_{{ question.question_id }}" 
+                                               value="False"
+                                               {% if question.correct_answer == False %}checked{% endif %}>
+                                        <label class="btn btn-outline-danger" for="no_{{ question.question_id }}">
+                                            <i class="bi bi-x-lg"></i> No
+                                        </label>
+                                    </div>
+                                    
+                                    <!-- Individual update button -->
+                                    <button type="button" 
+                                            class="btn btn-sm btn-primary mt-2 w-100 update-single-answer"
+                                            data-question-id="{{ question.question_id }}"
+                                            data-contest-id="{{ contest.contest_id }}">
+                                        <i class="bi bi-save"></i> Update This Answer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <!-- Submit All Button -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-all"></i> Set All Answers & Calculate Scores
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Contest Summary -->
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Contest Summary</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Total Questions:</strong> {{ questions|length }}</p>
+                            <p><strong>Questions with Answers:</strong> {{ questions|selectattr('has_answer')|list|length }}</p>
+                            <p><strong>Total Entries:</strong> {{ contest.entries.count() }}</p>
+                            <p><strong>Contest Locked:</strong><br>
+                            <small>{{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') if contest.lock_timestamp else 'Unknown' }}</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Important Notes</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="mb-0">
+                                <li>You can update individual answers or all at once</li>
+                                <li>Scores are recalculated automatically when answers are set</li>
+                                <li>Participants will see their updated scores immediately</li>
+                                <li>You can change answers later if needed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle individual answer updates
+    document.querySelectorAll('.update-single-answer').forEach(button => {
+        button.addEventListener('click', function() {
+            const questionId = this.dataset.questionId;
+            const contestId = this.dataset.contestId;
+            const selectedAnswer = document.querySelector(`input[name="question_${questionId}"]:checked`);
+            
+            if (!selectedAnswer) {
+                alert('Please select an answer first.');
+                return;
+            }
+            
+            const correctAnswer = selectedAnswer.value === 'True';
+            
+            // Disable button and show loading
+            this.disabled = true;
+            this.innerHTML = '<i class="bi bi-hourglass-split"></i> Updating...';
+            
+            fetch(`/contests/${contestId}/update-answer/${questionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    correct_answer: correctAnswer
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the UI to show success
+                    const questionItem = this.closest('.question-item');
+                    const alertDiv = questionItem.querySelector('.alert');
+                    
+                    alertDiv.className = 'alert alert-success py-2';
+                    alertDiv.innerHTML = `
+                        <small>
+                            <i class="bi bi-check-circle"></i> 
+                            Answer set: <strong>${correctAnswer ? 'Yes' : 'No'}</strong>
+                            just now
+                        </small>
+                    `;
+                    
+                    // Show success message
+                    const successAlert = document.createElement('div');
+                    successAlert.className = 'alert alert-success alert-dismissible fade show mt-3';
+                    successAlert.innerHTML = `
+                        <i class="bi bi-check-circle"></i> Answer updated successfully! Scores have been recalculated.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    questionItem.appendChild(successAlert);
+                    
+                    // Auto-dismiss after 3 seconds
+                    setTimeout(() => {
+                        if (successAlert.parentNode) {
+                            successAlert.remove();
+                        }
+                    }, 3000);
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error occurred'));
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating the answer.');
+            })
+            .finally(() => {
+                // Re-enable button
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-save"></i> Update This Answer';
+            });
+        });
+    });
+    
+    // Handle form submission
+    document.getElementById('answersForm').addEventListener('submit', function(e) {
+        const unansweredQuestions = [];
+        const questionInputs = document.querySelectorAll('input[type="radio"][name^="question_"]');
+        const questionNames = new Set();
+        
+        // Get all unique question names
+        questionInputs.forEach(input => {
+            questionNames.add(input.name);
+        });
+        
+        // Check each question for an answer
+        questionNames.forEach(questionName => {
+            const selectedAnswer = document.querySelector(`input[name="${questionName}"]:checked`);
+            if (!selectedAnswer) {
+                const questionNumber = questionName.replace('question_', '');
+                unansweredQuestions.push(`Question ${questionNumber}`);
+            }
+        });
+        
+        if (unansweredQuestions.length > 0) {
+            e.preventDefault();
+            alert('Please answer all questions before submitting:\n' + unansweredQuestions.join('\n'));
+            return false;
+        }
+        
+        // Confirm submission
+        if (!confirm('Are you sure you want to set all answers? This will calculate scores for all participants.')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

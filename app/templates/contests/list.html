@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Contests - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-trophy"></i> Active Contests</h2>
+                {% if current_user %}
+                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create Contest
+                </a>
+                {% endif %}
+            </div>
+
+            {% if contests.items %}
+            <div class="row">
+                {% for contest in contests.items %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">{{ contest.contest_name }}</h5>
+                            {% if contest.is_locked() %}
+                            <span class="badge bg-warning text-dark">Locked</span>
+                            {% else %}
+                            <span class="badge bg-success">Open</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            {% if contest.description %}
+                            <p class="card-text">{{ contest.description[:100] }}{% if contest.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> 
+                                    {% if contest.lock_timestamp %}
+                                    Locks: {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                    No lock time set
+                                    {% endif %}
+                                </small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-people"></i> {{ contest.entries.count() }} entries
+                                </small>
+                            </div>
+                            
+                            {% if contest.user %}
+                            <div class="mb-3">
+                                <small class="text-muted">
+                                    <i class="bi bi-person"></i> Created by {{ contest.user.username }}
+                                </small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer">
+                            <div class="d-flex justify-content-between">
+                                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-eye"></i> View Details
+                                </a>
+                                
+                                {% if current_user and not contest.is_locked() %}
+                                <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-primary btn-sm">
+                                    <i class="bi bi-pencil"></i> Enter Contest
+                                </a>
+                                {% elif contest.is_locked() %}
+                                <a href="{{ url_for('contests.leaderboard', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-info btn-sm">
+                                    <i class="bi bi-list-ol"></i> Leaderboard
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if contests.pages > 1 %}
+            <nav aria-label="Contests pagination" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if contests.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('contests.list_contests', page=contests.prev_num) }}">
+                            <i class="bi bi-chevron-left"></i> Previous
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for page_num in contests.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != contests.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('contests.list_contests', page=page_num) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if contests.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('contests.list_contests', page=contests.next_num) }}">
+                            Next <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+
+            <div class="text-center text-muted">
+                <small>
+                    Showing {{ contests.per_page * (contests.page - 1) + 1 }} to 
+                    {{ contests.per_page * (contests.page - 1) + contests.items|length }} of
+                    {{ contests.total }} contests
+                </small>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-trophy display-1 text-muted mb-3"></i>
+                <h4 class="text-muted">No Active Contests</h4>
+                <p class="text-muted">There are currently no active contests available.</p>
+                {% if current_user %}
+                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create the First Contest
+                </a>
+                {% else %}
+                <p class="text-muted">
+                    <a href="{{ url_for('auth.login') }}">Login</a> to create contests.
+                </p>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

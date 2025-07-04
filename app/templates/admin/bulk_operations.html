@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Operations - Admin - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-upload"></i> Bulk Operations</h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Admin</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">Bulk Operations</li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operation Description Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-trophy"></i> Create Contest</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Create a new contest with questions in one operation. Upload a JSON file containing contest details and all questions.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle text-success"></i> Contest metadata</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Multiple questions</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Lock timestamp</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Add Entries</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Add multiple user entries with answers to an existing contest. Users must already exist in the system.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle text-success"></i> Multiple users</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Complete answers</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Duplicate prevention</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="mb-0"><i class="bi bi-check-square"></i> Set Answers</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Set correct answers for all questions in a contest. This will trigger score recalculation for all entries.</p>
+                    <ul class="list-unstyled">
+                        <li><i class="bi bi-check-circle text-success"></i> Bulk answer setting</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Score recalculation</li>
+                        <li><i class="bi bi-check-circle text-success"></i> Question validation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Form -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-cloud-upload"></i> Upload JSON File</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-3">
+                            {{ form.operation_type.label(class="form-label") }}
+                            {{ form.operation_type(class="form-select") }}
+                            {% if form.operation_type.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.operation_type.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.json_file.label(class="form-label") }}
+                            {{ form.json_file(class="form-control", accept=".json") }}
+                            {% if form.json_file.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.json_file.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Upload a JSON file with the appropriate format for your selected operation.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Templates and Help -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-download"></i> JSON Templates</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Download template files to get started with the correct JSON format:</p>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin.download_template', operation_type='create_contest') }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-download"></i> Contest Template
+                        </a>
+                        <a href="{{ url_for('admin.download_template', operation_type='add_entries') }}" 
+                           class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-download"></i> Entries Template
+                        </a>
+                        <a href="{{ url_for('admin.download_template', operation_type='set_answers') }}" 
+                           class="btn btn-outline-warning btn-sm">
+                            <i class="bi bi-download"></i> Answers Template
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-info-circle"></i> Important Notes</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li class="mb-2">
+                            <i class="bi bi-exclamation-triangle text-warning"></i>
+                            <strong>Validation:</strong> All JSON files are validated before processing
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-shield-check text-success"></i>
+                            <strong>Safety:</strong> Operations use database transactions for data integrity
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-arrow-clockwise text-info"></i>
+                            <strong>Rollback:</strong> Any errors will rollback all changes
+                        </li>
+                        <li class="mb-2">
+                            <i class="bi bi-person-check text-primary"></i>
+                            <strong>Users:</strong> For entries, users must exist in the system
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Format Examples -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-code-square"></i> JSON Format Examples</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>Contest Creation Format</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+  "contest_name": "Sample Contest",
+  "description": "Contest description",
+  "lock_timestamp": "2025-01-15T18:00:00",
+  "is_active": true,
+  "questions": [
+    {
+      "question_text": "Will it rain?",
+      "question_order": 1
+    }
+  ]
+}</code></pre>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <h6>Bulk Entries Format</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+  "contest_id": 1,
+  "entries": [
+    {
+      "user_email": "user@example.com",
+      "answers": [
+        {
+          "question_order": 1,
+          "answer": true
+        }
+      ]
+    }
+  ]
+}</code></pre>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <h6>Set Answers Format</h6>
+                            <pre class="bg-light p-3 rounded"><code>{
+  "contest_id": 1,
+  "answers": [
+    {
+      "question_order": 1,
+      "correct_answer": true
+    }
+  ]
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Dynamic help text based on operation type
+document.addEventListener('DOMContentLoaded', function() {
+    const operationSelect = document.getElementById('operation_type');
+    const helpTexts = {
+        'create_contest': 'Create a new contest with questions. The contest will be created with the current admin user as the creator.',
+        'add_entries': 'Add entries to an existing contest. Users must already exist in the system. Duplicate entries will be skipped.',
+        'set_answers': 'Set correct answers for contest questions. This will recalculate scores for all existing entries.'
+    };
+    
+    function updateHelpText() {
+        const selectedOperation = operationSelect.value;
+        const helpElement = document.querySelector('.form-text');
+        if (helpElement && helpTexts[selectedOperation]) {
+            helpElement.textContent = helpTexts[selectedOperation];
+        }
+    }
+    
+    operationSelect.addEventListener('change', updateHelpText);
+    updateHelpText(); // Set initial text
+});
+</script>
+{% endblock %}

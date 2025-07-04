@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Set Answers - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="fas fa-check-circle"></i> Set Contest Answers
+                        </h4>
+                        <a href="{{ url_for('admin.manage_contests') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back to Contests
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Contest:</strong> {{ contest.contest_name }}
+                        <br>
+                        <strong>Status:</strong> 
+                        {% if contest.is_locked() %}
+                        <span class="badge bg-warning text-dark">Locked</span>
+                        {% else %}
+                        <span class="badge bg-info">Unlocked</span>
+                        {% endif %}
+                        <br>
+                        <small class="text-muted">
+                            Set the correct answers for each question. This will recalculate scores for all entries.
+                        </small>
+                    </div>
+
+                    <form method="POST" id="answers-form">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        {% for question in questions %}
+                        <div class="card mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0">Question {{ question.question_order }}</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text">{{ question.question_text }}</p>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="question_{{ question.question_id }}" 
+                                                   id="question_{{ question.question_id }}_yes" 
+                                                   value="True"
+                                                   {% if question.correct_answer == True %}checked{% endif %}>
+                                            <label class="form-check-label text-success" for="question_{{ question.question_id }}_yes">
+                                                <i class="fas fa-check"></i> Yes
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="question_{{ question.question_id }}" 
+                                                   id="question_{{ question.question_id }}_no" 
+                                                   value="False"
+                                                   {% if question.correct_answer == False %}checked{% endif %}>
+                                            <label class="form-check-label text-danger" for="question_{{ question.question_id }}_no">
+                                                <i class="fas fa-times"></i> No
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {% if question.has_answer() %}
+                                <div class="mt-2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i> 
+                                        Answer set on {{ question.answer_set_at.strftime('%Y-%m-%d %H:%M') if question.answer_set_at else 'Unknown' }}
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('admin.manage_contests') }}" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Answers
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Form validation
+    document.getElementById('answers-form').addEventListener('submit', function(e) {
+        const questions = document.querySelectorAll('[name^="question_"]');
+        const questionGroups = {};
+        
+        // Group radio buttons by question
+        questions.forEach(function(radio) {
+            const questionName = radio.name;
+            if (!questionGroups[questionName]) {
+                questionGroups[questionName] = [];
+            }
+            questionGroups[questionName].push(radio);
+        });
+        
+        // Check if all questions have answers
+        let allAnswered = true;
+        let unansweredQuestions = [];
+        
+        Object.keys(questionGroups).forEach(function(questionName) {
+            const radios = questionGroups[questionName];
+            const hasChecked = radios.some(function(radio) {
+                return radio.checked;
+            });
+            
+            if (!hasChecked) {
+                allAnswered = false;
+                // Extract question number from name
+                const questionMatch = questionName.match(/question_(\d+)/);
+                if (questionMatch) {
+                    unansweredQuestions.push(questionMatch[1]);
+                }
+            }
+        });
+        
+        if (!allAnswered) {
+            e.preventDefault();
+            alert('Please set answers for all questions before saving.\n\nUnanswered questions: ' + unansweredQuestions.join(', '));
+            return false;
+        }
+        
+        // Confirm before saving
+        if (!confirm('Are you sure you want to save these answers? This will recalculate scores for all contest entries.')) {
+            e.preventDefault();
+            return false;
+        }
+    });
+});
+</script>
+{% endblock %}

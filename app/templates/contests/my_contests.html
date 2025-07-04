@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}My Contests - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-person-circle"></i> My Contests</h2>
+                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create New Contest
+                </a>
+            </div>
+
+            <div class="row">
+                <!-- Created Contests -->
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-trophy"></i> Contests I Created</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if created_contests %}
+                            <div class="list-group list-group-flush">
+                                {% for contest in created_contests %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ contest.contest_name }}</h6>
+                                            {% if contest.description %}
+                                            <p class="mb-1 small text-muted">{{ contest.description[:80] }}{% if contest.description|length > 80 %}...{% endif %}</p>
+                                            {% endif %}
+                                            <small class="text-muted">
+                                                <i class="bi bi-clock"></i> 
+                                                {% if contest.lock_timestamp %}
+                                                Locks: {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M') }}
+                                                {% else %}
+                                                No lock time set
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            {% if contest.is_locked() %}
+                                            <span class="badge bg-warning text-dark mb-1">Locked</span>
+                                            {% else %}
+                                            <span class="badge bg-success mb-1">Open</span>
+                                            {% endif %}
+                                            <br>
+                                            <small class="text-muted">{{ contest.entries.count() }} entries</small>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-eye"></i> View
+                                        </a>
+                                        {% if not contest.is_locked() %}
+                                        <a href="{{ url_for('contests.edit_contest', contest_id=contest.contest_id) }}" 
+                                           class="btn btn-outline-secondary btn-sm">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </a>
+                                        {% endif %}
+                                        {% if contest.is_locked() %}
+                                        <a href="{{ url_for('contests.set_answers', contest_id=contest.contest_id) }}" 
+                                           class="btn btn-outline-warning btn-sm">
+                                            <i class="bi bi-check-circle"></i> Set Answers
+                                        </a>
+                                        <a href="{{ url_for('contests.leaderboard', contest_id=contest.contest_id) }}" 
+                                           class="btn btn-outline-info btn-sm">
+                                            <i class="bi bi-list-ol"></i> Leaderboard
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-trophy display-1 text-muted mb-3"></i>
+                                <h6 class="text-muted">No Contests Created</h6>
+                                <p class="text-muted">You haven't created any contests yet.</p>
+                                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle"></i> Create Your First Contest
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contest Entries -->
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-pencil-square"></i> My Contest Entries</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if contest_entries %}
+                            <div class="list-group list-group-flush">
+                                {% for entry in contest_entries %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">{{ entry.contest.contest_name }}</h6>
+                                            {% if entry.contest.description %}
+                                            <p class="mb-1 small text-muted">{{ entry.contest.description[:80] }}{% if entry.contest.description|length > 80 %}...{% endif %}</p>
+                                            {% endif %}
+                                            <small class="text-muted">
+                                                <i class="bi bi-calendar"></i> 
+                                                Entered: {{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else 'Unknown' }}
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            {% if entry.contest.is_locked() %}
+                                            <span class="badge bg-warning text-dark mb-1">Contest Locked</span>
+                                            <br>
+                                            {% if entry.score is not none %}
+                                            <span class="badge bg-success">Score: {{ entry.score }}</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Score: Pending</span>
+                                            {% endif %}
+                                            {% else %}
+                                            <span class="badge bg-success mb-1">Contest Open</span>
+                                            <br>
+                                            <small class="text-muted">Can modify entry</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="mt-2">
+                                        <a href="{{ url_for('contests.view_contest', contest_id=entry.contest.contest_id) }}" 
+                                           class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-eye"></i> View Contest
+                                        </a>
+                                        {% if not entry.contest.is_locked() %}
+                                        <a href="{{ url_for('contests.enter_contest', contest_id=entry.contest.contest_id) }}" 
+                                           class="btn btn-outline-warning btn-sm">
+                                            <i class="bi bi-pencil"></i> Modify Entry
+                                        </a>
+                                        {% else %}
+                                        <a href="{{ url_for('contests.leaderboard', contest_id=entry.contest.contest_id) }}" 
+                                           class="btn btn-outline-info btn-sm">
+                                            <i class="bi bi-list-ol"></i> Leaderboard
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <i class="bi bi-pencil-square display-1 text-muted mb-3"></i>
+                                <h6 class="text-muted">No Contest Entries</h6>
+                                <p class="text-muted">You haven't entered any contests yet.</p>
+                                <a href="{{ url_for('contests.list_contests') }}" class="btn btn-primary">
+                                    <i class="bi bi-search"></i> Browse Contests
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enhanced Statistics -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Contest Performance Statistics</h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- Basic Stats Row -->
+                            <div class="row text-center mb-4">
+                                <div class="col-md-3">
+                                    <div class="border-end">
+                                        <h4 class="text-primary">{{ created_contests|length }}</h4>
+                                        <small class="text-muted">Contests Created</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border-end">
+                                        <h4 class="text-success">{{ stats.total_entries }}</h4>
+                                        <small class="text-muted">Contests Entered</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="border-end">
+                                        <h4 class="text-warning">{{ stats.completed_contests }}</h4>
+                                        <small class="text-muted">Completed Contests</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    {% set total_participants = 0 %}
+                                    {% for contest in created_contests %}
+                                        {% set total_participants = total_participants + contest.entries.count() %}
+                                    {% endfor %}
+                                    <h4 class="text-info">{{ total_participants }}</h4>
+                                    <small class="text-muted">Total Participants in My Contests</small>
+                                </div>
+                            </div>
+
+                            {% if stats.completed_contests > 0 %}
+                            <!-- Performance Stats Row -->
+                            <div class="row text-center mb-4">
+                                <div class="col-md-2">
+                                    <div class="border-end">
+                                        <h4 class="text-success">{{ stats.first_place_finishes }}</h4>
+                                        <small class="text-muted">1st Place Finishes</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="border-end">
+                                        <h4 class="text-warning">{{ stats.top_3_finishes }}</h4>
+                                        <small class="text-muted">Top 3 Finishes</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="border-end">
+                                        <h4 class="text-primary">{{ stats.average_position }}</h4>
+                                        <small class="text-muted">Average Position</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="border-end">
+                                        <h4 class="text-success">{{ stats.best_position if stats.best_position else '-' }}</h4>
+                                        <small class="text-muted">Best Position</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="border-end">
+                                        <h4 class="text-danger">{{ stats.worst_position if stats.worst_position else '-' }}</h4>
+                                        <small class="text-muted">Worst Position</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <h4 class="text-info">{{ stats.overall_accuracy }}%</h4>
+                                    <small class="text-muted">Overall Accuracy</small>
+                                </div>
+                            </div>
+
+                            <!-- Win Rate Stats Row -->
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <div class="border-end">
+                                        <h4 class="text-success">{{ stats.win_rate }}%</h4>
+                                        <small class="text-muted">Win Rate</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="border-end">
+                                        <h4 class="text-warning">{{ stats.top_3_rate }}%</h4>
+                                        <small class="text-muted">Top 3 Rate</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <h4 class="text-primary">{{ stats.total_score }}/{{ stats.total_possible_score }}</h4>
+                                    <small class="text-muted">Total Score</small>
+                                </div>
+                            </div>
+
+                            <!-- Performance Insights -->
+                            {% if stats.completed_contests >= 3 %}
+                            <div class="mt-4 pt-3 border-top">
+                                <h6 class="text-muted mb-3"><i class="bi bi-lightbulb"></i> Performance Insights</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        {% if stats.win_rate >= 30 %}
+                                        <div class="alert alert-success py-2">
+                                            <small><i class="bi bi-trophy"></i> <strong>Excellent!</strong> You're winning {{ stats.win_rate }}% of your contests.</small>
+                                        </div>
+                                        {% elif stats.win_rate >= 15 %}
+                                        <div class="alert alert-info py-2">
+                                            <small><i class="bi bi-star"></i> <strong>Good performance!</strong> You're winning {{ stats.win_rate }}% of your contests.</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-warning py-2">
+                                            <small><i class="bi bi-target"></i> <strong>Room for improvement!</strong> Keep practicing to increase your win rate.</small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6">
+                                        {% if stats.overall_accuracy >= 80 %}
+                                        <div class="alert alert-success py-2">
+                                            <small><i class="bi bi-bullseye"></i> <strong>Sharp predictions!</strong> {{ stats.overall_accuracy }}% accuracy rate.</small>
+                                        </div>
+                                        {% elif stats.overall_accuracy >= 60 %}
+                                        <div class="alert alert-info py-2">
+                                            <small><i class="bi bi-graph-up"></i> <strong>Solid accuracy!</strong> {{ stats.overall_accuracy }}% correct predictions.</small>
+                                        </div>
+                                        {% else %}
+                                        <div class="alert alert-warning py-2">
+                                            <small><i class="bi bi-arrow-up"></i> <strong>Keep learning!</strong> Focus on improving prediction accuracy.</small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% else %}
+                            <div class="text-center py-3">
+                                <p class="text-muted mb-0">
+                                    <i class="bi bi-info-circle"></i> 
+                                    Complete some contests to see detailed performance statistics!
+                                </p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

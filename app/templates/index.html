@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Home - Over-Under Contests{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white p-5 rounded">
+            <h1 class="display-4">Welcome to Over-Under Contests</h1>
+            <p class="lead">Create and participate in exciting Yes/No prediction contests with friends and the community.</p>
+            {% if not current_user %}
+            <hr class="my-4">
+            <p>Join now to start creating contests or participating in existing ones!</p>
+            <a class="btn btn-light btn-lg" href="{{ url_for('auth.register') }}" role="button">
+                <i class="bi bi-person-plus"></i> Get Started
+            </a>
+            {% else %}
+            <hr class="my-4">
+            <p>Ready to create your next contest or join an existing one?</p>
+            <a class="btn btn-light btn-lg me-2" href="{{ url_for('contests.create_contest') }}" role="button">
+                <i class="bi bi-plus-circle"></i> Create Contest
+            </a>
+            <a class="btn btn-outline-light btn-lg" href="{{ url_for('contests.list_contests') }}" role="button">
+                <i class="bi bi-list"></i> Browse Contests
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Features Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h2 class="text-center mb-4">How It Works</h2>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-plus-circle-fill text-primary" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Create Contests</h5>
+                <p class="card-text">Set up your own Yes/No prediction contests with custom questions and lock dates.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-people-fill text-success" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Participate</h5>
+                <p class="card-text">Join contests created by others and make your Yes/No predictions before the lock date.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-trophy-fill text-warning" style="font-size: 3rem;"></i>
+                <h5 class="card-title mt-3">Compete</h5>
+                <p class="card-text">See how you rank against other participants on the leaderboard after contests lock.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Contests Section -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3>Active Contests</h3>
+            <a href="{{ url_for('contests.list_contests') }}" class="btn btn-outline-primary">
+                View All <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+        
+        {% if contests.items %}
+        <div class="row">
+            {% for contest in contests.items[:6] %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ contest.contest_name }}</h5>
+                        <p class="card-text">{{ contest.description[:100] }}{% if contest.description|length > 100 %}...{% endif %}</p>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ contest.creator.username }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar"></i> 
+                                Locks: {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M') }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {% if contest.is_locked() %}
+                                <span class="badge bg-danger">Locked</span>
+                            {% else %}
+                                <span class="badge bg-success">Open</span>
+                            {% endif %}
+                            
+                            <span class="badge bg-info">{{ contest.questions.count() }} Questions</span>
+                            <span class="badge bg-secondary">{{ contest.entries.count() }} Entries</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" 
+                           class="btn btn-primary btn-sm">
+                            View Contest
+                        </a>
+                        
+                        {% if current_user and not contest.is_locked() %}
+                            {% set user_entry = contest.entries.filter_by(user_id=current_user.user_id).first() %}
+                            {% if not user_entry %}
+                                <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-success btn-sm">
+                                    Enter Contest
+                                </a>
+                            {% else %}
+                                <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-warning btn-sm">
+                                    Edit Entry
+                                </a>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if contests.pages > 1 %}
+        <nav aria-label="Contest pagination">
+            <ul class="pagination justify-content-center">
+                {% if contests.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.index', page=contests.prev_num) }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in contests.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != contests.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.index', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if contests.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.index', page=contests.next_num) }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+            <h4 class="text-muted mt-3">No Active Contests</h4>
+            <p class="text-muted">Be the first to create a contest!</p>
+            {% if current_user %}
+            <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Create Contest
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

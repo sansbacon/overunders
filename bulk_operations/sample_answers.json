@@ -1,0 +1,10 @@
+{
+  "contest_id": 1,
+  "answers": [
+    {"question_order": 1, "correct_answer": true},
+    {"question_order": 2, "correct_answer": false},
+    {"question_order": 3, "correct_answer": true},
+    {"question_order": 4, "correct_answer": false},
+    {"question_order": 5, "correct_answer": true}
+  ]
+}

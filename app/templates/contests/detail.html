@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}{{ contest.contest_name }} - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Contest Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2>{{ contest.contest_name }}</h2>
+                    {% if contest.is_locked() %}
+                    <span class="badge bg-warning text-dark fs-6">Contest Locked</span>
+                    {% else %}
+                    <span class="badge bg-success fs-6">Contest Open</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{{ url_for('contests.list_contests') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Contests
+                    </a>
+                    {% if current_user and current_user.user_id == contest.created_by_user %}
+                    <a href="{{ url_for('contests.edit_contest', contest_id=contest.contest_id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit Contest
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Contest Info -->
+                <div class="col-lg-8">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-info-circle"></i> Contest Information</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if contest.description %}
+                            <p class="card-text">{{ contest.description }}</p>
+                            {% endif %}
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Lock Time:</strong><br>
+                                    {% if contest.lock_timestamp %}
+                                    {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') }}
+                                    {% else %}
+                                    <span class="text-muted">Not set</span>
+                                    {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Total Entries:</strong><br>
+                                    <span class="badge bg-primary">{{ contest.entries.count() }}</span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Created By:</strong><br>
+                                    {% if contest.creator %}
+                                    {{ contest.creator.get_display_name() }}
+                                    {% else %}
+                                    <span class="text-muted">Unknown</span>
+                                    {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Created:</strong><br>
+                                    {{ contest.created_at.strftime('%Y-%m-%d %H:%M') if contest.created_at else 'Unknown' }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Questions -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-question-circle"></i> Questions ({{ questions|length }})</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if questions %}
+                            <div class="list-group list-group-flush">
+                                {% for question in questions %}
+                                <div class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="mb-1">Question {{ question.question_order }}</h6>
+                                            <p class="mb-1">{{ question.question_text }}</p>
+                                            {% if contest.is_locked() %}
+                                            <small class="text-muted">
+                                                <strong>Correct Answer:</strong> 
+                                                <span class="badge bg-{{ 'success' if question.correct_answer else 'danger' }}">
+                                                    {{ 'Yes' if question.correct_answer else 'No' }}
+                                                </span>
+                                            </small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No questions have been added to this contest yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- User's Entry Status -->
+                    {% if current_user %}
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0"><i class="bi bi-person-check"></i> Your Entry Status</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if user_entry %}
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> You have submitted an entry for this contest.
+                                <br><small>Last updated: {{ user_entry.updated_at.strftime('%Y-%m-%d %H:%M') if user_entry.updated_at else user_entry.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                            {% if not contest.is_locked() %}
+                            <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" class="btn btn-warning">
+                                <i class="bi bi-pencil"></i> Modify Entry
+                            </a>
+                            {% endif %}
+                            {% else %}
+                            {% if not contest.is_locked() %}
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i> You haven't entered this contest yet.
+                            </div>
+                            <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Enter Contest
+                            </a>
+                            {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-lock"></i> Contest is locked. No more entries allowed.
+                            </div>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Quick Actions -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-lightning"></i> Quick Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if current_user and not contest.is_locked() %}
+                            <a href="{{ url_for('contests.enter_contest', contest_id=contest.contest_id) }}" 
+                               class="btn btn-primary btn-sm w-100 mb-2">
+                                <i class="bi bi-pencil"></i> {{ 'Modify' if user_entry else 'Enter' }} Contest
+                            </a>
+                            {% endif %}
+                            
+                            {% if contest.is_locked() %}
+                            <a href="{{ url_for('contests.leaderboard', contest_id=contest.contest_id) }}" 
+                               class="btn btn-info btn-sm w-100 mb-2">
+                                <i class="bi bi-list-ol"></i> View Leaderboard
+                            </a>
+                            {% endif %}
+                            
+                        {% if current_user and current_user.user_id == contest.created_by_user %}
+                        {% if not contest.is_locked() %}
+                        <a href="{{ url_for('contests.edit_contest', contest_id=contest.contest_id) }}" 
+                           class="btn btn-outline-secondary btn-sm w-100 mb-2">
+                            <i class="bi bi-pencil"></i> Edit Contest
+                        </a>
+                        <a href="{{ url_for('contests.invite_to_contest', contest_id=contest.contest_id) }}" 
+                           class="btn btn-outline-primary btn-sm w-100 mb-2">
+                            <i class="bi bi-envelope"></i> Send Invitations
+                        </a>
+                        <button type="button" class="btn btn-outline-info btn-sm w-100 mb-2" onclick="copyInvitationText()">
+                            <i class="bi bi-clipboard"></i> Copy Invitation
+                        </button>
+                        {% else %}
+                        <a href="{{ url_for('contests.set_answers', contest_id=contest.contest_id) }}" 
+                           class="btn btn-outline-warning btn-sm w-100 mb-2">
+                            <i class="bi bi-check-circle"></i> Set Answers
+                        </a>
+                        <button type="button" class="btn btn-outline-info btn-sm w-100 mb-2" onclick="copyInvitationText()">
+                            <i class="bi bi-clipboard"></i> Copy Invitation
+                        </button>
+                        {% endif %}
+                        {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Leaderboard Preview -->
+                    {% if contest.is_locked() and leaderboard %}
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-trophy"></i> Top Performers</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group list-group-flush">
+                                {% for entry in leaderboard[:5] %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                                    <div>
+                                        <strong>{{ entry.user.get_display_name() }}</strong>
+                                        {% if loop.index <= 3 %}
+                                        <i class="bi bi-trophy-fill text-{{ 'warning' if loop.index == 1 else 'secondary' if loop.index == 2 else 'warning' }}"></i>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-primary">{{ entry.score }}</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if leaderboard|length > 5 %}
+                            <div class="text-center mt-3">
+                                <a href="{{ url_for('contests.leaderboard', contest_id=contest.contest_id) }}" 
+                                   class="btn btn-outline-info btn-sm">
+                                    View Full Leaderboard
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyInvitationText() {
+    // Generate the invitation text
+    const invitationText = `🎯 Contest Invitation!
+
+{{ current_user.get_display_name() if current_user else 'Someone' }} has invited you to participate in an exciting Over-Under contest!
+
+Contest: {{ contest.contest_name }}
+{% if contest.description %}Description: {{ contest.description }}
+{% endif %}
+How it works: You'll predict Yes/No answers to a series of questions. After the contest locks, correct answers are revealed and scores are calculated based on how many you got right.
+
+⏰ IMPORTANT - Entry Deadline:
+{{ contest.lock_timestamp|to_central_time|strftime('%B %d, %Y at %I:%M %p Central Time') }}
+
+Ready to play? Join here:
+{{ url_for('contests.view_contest', contest_id=contest.contest_id, _external=True) }}
+
+If you don't have an account, you can register with just your email - no password required!
+
+Good luck and have fun!
+Over-Under Contests`;
+
+    // Create a temporary textarea to copy the text
+    const tempTextArea = document.createElement('textarea');
+    tempTextArea.value = invitationText;
+    document.body.appendChild(tempTextArea);
+    tempTextArea.select();
+    tempTextArea.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        
+        // Update button text temporarily
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+        button.classList.remove('btn-outline-info');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-info');
+        }, 2000);
+        
+    } catch (err) {
+        // Fallback for browsers that don't support execCommand
+        alert('Please manually copy this invitation text:\n\n' + invitationText);
+    }
+    
+    // Remove the temporary textarea
+    document.body.removeChild(tempTextArea);
+}
+</script>
+{% endblock %}

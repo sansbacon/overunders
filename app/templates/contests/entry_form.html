@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Enter Contest: {{ contest.contest_name }} - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">{{ 'Modify Entry' if entry.entry_id else 'Enter Contest' }}: {{ contest.contest_name }}</h4>
+                        <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Back to Contest
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if contest.description %}
+                    <div class="alert alert-info">
+                        <strong>Contest Description:</strong> {{ contest.description }}
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-clock"></i> 
+                        <strong>Contest locks at:</strong> 
+                        {% if contest.lock_timestamp %}
+                        {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') }}
+                        {% else %}
+                        Not set
+                        {% endif %}
+                    </div>
+
+                    <form method="POST" id="entry-form" data-is-update="{% if entry.entry_id %}true{% else %}false{% endif %}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2">Questions</h5>
+                            <p class="text-muted">Answer each question with Yes (True) or No (False):</p>
+                        </div>
+
+                        {% for question in questions %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-title">Question {{ question.question_order }}</h6>
+                                <p class="card-text">{{ question.question_text }}</p>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="question_{{ question.question_id }}" 
+                                                   id="question_{{ question.question_id }}_true" 
+                                                   value="True"
+                                                   {% if existing_answers.get(question.question_id) == True %}checked{% endif %}>
+                                            <label class="form-check-label" for="question_{{ question.question_id }}_true">
+                                                <i class="bi bi-check-circle text-success"></i> Yes (True)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" 
+                                                   name="question_{{ question.question_id }}" 
+                                                   id="question_{{ question.question_id }}_false" 
+                                                   value="False"
+                                                   {% if existing_answers.get(question.question_id) == False %}checked{% endif %}>
+                                            <label class="form-check-label" for="question_{{ question.question_id }}_false">
+                                                <i class="bi bi-x-circle text-danger"></i> No (False)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        {% if not questions %}
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> This contest has no questions yet.
+                        </div>
+                        {% endif %}
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-secondary">Cancel</a>
+                            {% if questions %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> {{ 'Update Entry' if entry.entry_id else 'Submit Entry' }}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Entry Instructions -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> How to Enter</h6>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Answer each question with either <strong>Yes (True)</strong> or <strong>No (False)</strong></li>
+                        <li>You can modify your entry until the contest is locked</li>
+                        <li>Once the contest is locked, answers will be revealed and scores calculated</li>
+                        <li>You get 1 point for each correct answer</li>
+                        <li>The participant with the highest score wins!</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('entry-form');
+    const questions = document.querySelectorAll('input[type="radio"]');
+    
+    // Form validation
+    form.addEventListener('submit', function(e) {
+        const questionGroups = {};
+        
+        // Group questions by name
+        questions.forEach(input => {
+            const questionName = input.name;
+            if (!questionGroups[questionName]) {
+                questionGroups[questionName] = [];
+            }
+            questionGroups[questionName].push(input);
+        });
+        
+        // Check if all questions are answered
+        let allAnswered = true;
+        const unansweredQuestions = [];
+        
+        Object.keys(questionGroups).forEach(questionName => {
+            const group = questionGroups[questionName];
+            const isAnswered = group.some(input => input.checked);
+            
+            if (!isAnswered) {
+                allAnswered = false;
+                // Extract question number from name
+                const questionNumber = questionName.replace('question_', '');
+                unansweredQuestions.push(questionNumber);
+            }
+        });
+        
+        if (!allAnswered) {
+            e.preventDefault();
+            alert('Please answer all questions before submitting your entry.');
+            
+            // Scroll to first unanswered question
+            if (unansweredQuestions.length > 0) {
+                const firstUnanswered = document.querySelector(`input[name="question_${unansweredQuestions[0]}"]`);
+                if (firstUnanswered) {
+                    firstUnanswered.closest('.card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+            
+            return false;
+        }
+        
+        // Confirm submission
+        const isUpdate = form.getAttribute('data-is-update') === 'true';
+        const message = isUpdate ? 
+            'Are you sure you want to update your entry?' : 
+            'Are you sure you want to submit your entry?';
+            
+        if (!confirm(message)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Highlight selected answers
+    questions.forEach(input => {
+        input.addEventListener('change', function() {
+            const card = this.closest('.card');
+            const allInputs = card.querySelectorAll('input[type="radio"]');
+            
+            // Remove highlight from all options
+            allInputs.forEach(inp => {
+                inp.closest('.form-check').classList.remove('bg-light');
+            });
+            
+            // Highlight selected option
+            if (this.checked) {
+                this.closest('.form-check').classList.add('bg-light');
+            }
+        });
+        
+        // Initial highlighting for pre-selected answers
+        if (input.checked) {
+            input.closest('.form-check').classList.add('bg-light');
+        }
+    });
+});
+</script>
+{% endblock %}

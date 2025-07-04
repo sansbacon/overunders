@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-person-plus"></i> Create Account</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted text-center mb-4">
+                    Join Over-Under Contests to create and participate in prediction contests.
+                </p>
+                
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        {% if form.username.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.username.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Choose a unique username that others will see.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.email.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">We'll use this to send you login links.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.mobile_phone.label(class="form-label") }}
+                        {{ form.mobile_phone(class="form-control" + (" is-invalid" if form.mobile_phone.errors else "")) }}
+                        {% if form.mobile_phone.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.mobile_phone.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Optional - for future SMS notifications.</div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-success") }}
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-0">Already have an account?</p>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-box-arrow-in-right"></i> Login Here
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Terms Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-shield-check"></i> Privacy & Terms</h6>
+                <p class="small text-muted mb-0">
+                    By creating an account, you agree to use this service responsibly. 
+                    We'll only use your email for login links and important account notifications. 
+                    Your mobile phone number is optional and will only be used for SMS notifications if you choose to enable them.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+Flask==2.3.3
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.5
+Flask-Mail==0.9.1
+Flask-WTF==1.1.1
+WTForms==3.0.1
+email-validator==2.0.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
+psycopg2-binary==2.9.7
+pytz==2023.3
+sendgrid==6.10.0

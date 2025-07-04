@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-box-arrow-in-right"></i> Login</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted text-center mb-4">
+                    Enter your email address and we'll send you a secure login link.
+                </p>
+                
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control" + (" is-invalid" if form.email.errors else "")) }}
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.email.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-0">Don't have an account?</p>
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-person-plus"></i> Register Here
+                    </a>
+                </div>
+                
+                <hr class="my-3">
+                
+                <div class="text-center">
+                    <p class="mb-0">Admin user?</p>
+                    <a href="{{ url_for('auth.admin_login') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-shield-lock"></i> Admin Login
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-info-circle"></i> How Login Works</h6>
+                <ul class="small text-muted mb-0">
+                    <li>Enter your email address above</li>
+                    <li>We'll send you a secure login link</li>
+                    <li>Click the link in your email to log in</li>
+                    <li>The link expires in 30 minutes for security</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

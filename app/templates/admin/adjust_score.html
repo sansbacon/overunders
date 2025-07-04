@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Adjust Score - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Adjust Entry Score</h2>
+                <a href="{{ url_for('admin.view_contest_entries', contest_id=entry.contest_id) }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Entries
+                </a>
+            </div>
+
+            <!-- Entry Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Entry Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Contest:</strong> {{ entry.contest.contest_name }}</p>
+                            <p><strong>User:</strong> {{ entry.user.username }}</p>
+                            <p><strong>Email:</strong> {{ entry.user.email }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Entry ID:</strong> {{ entry.entry_id }}</p>
+                            <p><strong>Submitted:</strong> {{ entry.created_at.strftime('%Y-%m-%d %H:%M:%S') if entry.created_at else 'Unknown' }}</p>
+                            <p><strong>Current Score:</strong> 
+                                {% set score_data = entry.calculate_score() %}
+                                <span class="badge bg-success">{{ score_data.total_score }}</span>
+                                ({{ "%.1f"|format(score_data.percentage) }}%)
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Score Adjustment Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Manual Score Adjustment</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Note:</strong> This is a manual score adjustment feature. In the current implementation, 
+                        adjustments are logged but not permanently stored. This would typically be implemented with 
+                        a separate adjustments table in a production system.
+                    </div>
+
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.adjustment_points.label(class="form-label") }}
+                                    {{ form.adjustment_points(class="form-control" + (" is-invalid" if form.adjustment_points.errors else "")) }}
+                                    {% if form.adjustment_points.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.adjustment_points.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        Enter positive or negative points to adjust the score. 
+                                        Current score: {{ score_data.total_score }} points
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">New Score Preview</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="newScorePreview" readonly>
+                                        <span class="input-group-text">points</span>
+                                    </div>
+                                    <div class="form-text">
+                                        This will be the new total score after adjustment
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.reason.label(class="form-label") }}
+                            {{ form.reason(class="form-control" + (" is-invalid" if form.reason.errors else "")) }}
+                            {% if form.reason.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.reason.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">
+                                Please provide a clear reason for this score adjustment for audit purposes.
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                {{ form.submit(class="btn btn-warning") }}
+                                <a href="{{ url_for('admin.view_contest_entries', contest_id=entry.contest_id) }}" 
+                                   class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Entry Details -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Entry Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            <h4 class="text-primary">{{ score_data.correct_answers }}</h4>
+                            <small class="text-muted">Correct Answers</small>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h4 class="text-success">{{ score_data.total_score }}</h4>
+                            <small class="text-muted">Total Points</small>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <h4 class="text-info">{{ "%.1f"|format(score_data.percentage) }}%</h4>
+                            <small class="text-muted">Percentage</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var currentScore = parseInt('{{ score_data.total_score }}');
+    var adjustmentInput = document.getElementById('adjustment_points');
+    var previewInput = document.getElementById('newScorePreview');
+    
+    function updatePreview() {
+        var adjustment = parseInt(adjustmentInput.value) || 0;
+        var newScore = currentScore + adjustment;
+        previewInput.value = newScore;
+        
+        // Update preview styling based on change
+        if (adjustment > 0) {
+            previewInput.className = 'form-control text-success';
+        } else if (adjustment < 0) {
+            previewInput.className = 'form-control text-danger';
+        } else {
+            previewInput.className = 'form-control';
+        }
+    }
+    
+    // Initialize preview
+    updatePreview();
+    
+    // Update preview on input change
+    if (adjustmentInput) {
+        adjustmentInput.addEventListener('input', updatePreview);
+    }
+});
+</script>
+{% endblock %}

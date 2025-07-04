@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Email Log Detail - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Email Log Detail</h1>
+                <a href="{{ url_for('admin.email_logs') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Email Logs
+                </a>
+            </div>
+
+            <div class="row">
+                <!-- Basic Information -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5>Basic Information</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Log ID:</strong></td>
+                                    <td>{{ log.log_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Sent At:</strong></td>
+                                    <td>{{ log.sent_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Recipient:</strong></td>
+                                    <td>{{ log.recipient_email }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email Type:</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.email_type }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Delivery Method:</strong></td>
+                                    <td>
+                                        {% if log.delivery_method == 'sendgrid_api' %}
+                                            <span class="badge bg-info">SendGrid API</span>
+                                        {% elif log.delivery_method == 'smtp' %}
+                                            <span class="badge bg-warning">SMTP</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.delivery_method }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        {% if log.status == 'sent' %}
+                                            <span class="badge bg-success">Sent</span>
+                                        {% elif log.status == 'failed' %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if log.response_code %}
+                                <tr>
+                                    <td><strong>Response Code:</strong></td>
+                                    <td>
+                                        <span class="badge {% if log.response_code == 202 %}bg-success{% else %}bg-warning{% endif %}">
+                                            {{ log.response_code }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Associated Records -->
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5>Associated Records</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                {% if log.user %}
+                                <tr>
+                                    <td><strong>User:</strong></td>
+                                    <td>
+                                        <a href="{{ url_for('admin.edit_user', user_id=log.user.user_id) }}">
+                                            {{ log.user.get_display_name() }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if log.contest %}
+                                <tr>
+                                    <td><strong>Contest:</strong></td>
+                                    <td>
+                                        <a href="{{ url_for('admin.view_contest_entries', contest_id=log.contest.contest_id) }}">
+                                            {{ log.contest.contest_name }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if not log.user and not log.contest %}
+                                <tr>
+                                    <td colspan="2">
+                                        <em class="text-muted">No associated records</em>
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Email Subject -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Email Subject</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ log.subject }}</p>
+                </div>
+            </div>
+
+            <!-- Error Information (if failed) -->
+            {% if log.status == 'failed' and log.error_message %}
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5>Error Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <strong>Error Message:</strong><br>
+                        <code>{{ log.error_message }}</code>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Response Information -->
+            {% if log.response_body %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Response Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if log.response_code %}
+                        <div class="col-md-3">
+                            <strong>Response Code:</strong><br>
+                            <span class="badge {% if log.response_code == 202 %}bg-success{% else %}bg-warning{% endif %} fs-6">
+                                {{ log.response_code }}
+                            </span>
+                        </div>
+                        {% endif %}
+                        <div class="col-md-9">
+                            <strong>Response Body:</strong><br>
+                            <pre class="bg-light p-3 rounded"><code>{{ log.response_body }}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Troubleshooting Tips -->
+            {% if log.status == 'failed' %}
+            <div class="card mb-4">
+                <div class="card-header bg-warning">
+                    <h5>Troubleshooting Tips</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Common Issues and Solutions:</h6>
+                    <ul>
+                        <li><strong>SendGrid API Key Issues:</strong> Verify the API key is valid and has send permissions</li>
+                        <li><strong>Sender Verification:</strong> Ensure the sender email is verified in SendGrid</li>
+                        <li><strong>Rate Limits:</strong> Check if you've exceeded SendGrid's rate limits</li>
+                        <li><strong>SMTP Connection:</strong> Verify SMTP server settings and credentials</li>
+                        <li><strong>Network Issues:</strong> Check internet connectivity and firewall settings</li>
+                        <li><strong>Email Format:</strong> Ensure recipient email address is valid</li>
+                    </ul>
+                    
+                    {% if log.delivery_method == 'sendgrid_api' %}
+                    <div class="alert alert-info mt-3">
+                        <strong>SendGrid API Specific:</strong><br>
+                        • Check your SendGrid dashboard for additional error details<br>
+                        • Verify your account status and sending limits<br>
+                        • Ensure the sender email is verified in SendGrid
+                    </div>
+                    {% elif log.delivery_method == 'smtp' %}
+                    <div class="alert alert-info mt-3">
+                        <strong>SMTP Specific:</strong><br>
+                        • Verify SMTP server settings (host, port, TLS)<br>
+                        • Check username and password credentials<br>
+                        • Ensure firewall allows SMTP connections
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('admin.email_logs') }}" class="btn btn-secondary">
+                            <i class="fas fa-list"></i> Back to Email Logs
+                        </a>
+                        {% if log.status == 'failed' %}
+                        <button type="button" class="btn btn-warning" onclick="alert('Retry functionality would be implemented here')">
+                            <i class="fas fa-redo"></i> Retry Send (Not Implemented)
+                        </button>
+                        {% endif %}
+                        {% if log.user %}
+                        <a href="{{ url_for('admin.edit_user', user_id=log.user.user_id) }}" class="btn btn-info">
+                            <i class="fas fa-user"></i> View User
+                        </a>
+                        {% endif %}
+                        {% if log.contest %}
+                        <a href="{{ url_for('admin.view_contest_entries', contest_id=log.contest.contest_id) }}" class="btn btn-info">
+                            <i class="fas fa-trophy"></i> View Contest
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

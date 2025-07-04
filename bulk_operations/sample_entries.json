@@ -1,0 +1,35 @@
+{
+  "contest_id": 1,
+  "entries": [
+    {
+      "user_email": "user1@example.com",
+      "answers": [
+        {"question_order": 1, "answer": true},
+        {"question_order": 2, "answer": false},
+        {"question_order": 3, "answer": true},
+        {"question_order": 4, "answer": false},
+        {"question_order": 5, "answer": true}
+      ]
+    },
+    {
+      "user_email": "user2@example.com",
+      "answers": [
+        {"question_order": 1, "answer": false},
+        {"question_order": 2, "answer": true},
+        {"question_order": 3, "answer": false},
+        {"question_order": 4, "answer": false},
+        {"question_order": 5, "answer": false}
+      ]
+    },
+    {
+      "user_email": "user3@example.com",
+      "answers": [
+        {"question_order": 1, "answer": true},
+        {"question_order": 2, "answer": true},
+        {"question_order": 3, "answer": true},
+        {"question_order": 4, "answer": true},
+        {"question_order": 5, "answer": true}
+      ]
+    }
+  ]
+}

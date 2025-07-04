@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Contests - Admin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Manage Contests</h2>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Search and Filter Form -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-6">
+                            <input type="text" class="form-control" name="search" 
+                                   placeholder="Search by contest name..." 
+                                   value="{{ search }}">
+                        </div>
+                        <div class="col-md-3">
+                            <select name="status" class="form-select">
+                                <option value="all" {{ 'selected' if status == 'all' else '' }}>All Contests</option>
+                                <option value="active" {{ 'selected' if status == 'active' else '' }}>Active</option>
+                                <option value="inactive" {{ 'selected' if status == 'inactive' else '' }}>Inactive</option>
+                                <option value="locked" {{ 'selected' if status == 'locked' else '' }}>Locked</option>
+                                <option value="unlocked" {{ 'selected' if status == 'unlocked' else '' }}>Unlocked</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filter
+                            </button>
+                            {% if search or status != 'all' %}
+                            <a href="{{ url_for('admin.manage_contests') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times"></i> Clear
+                            </a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Contests Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        Contests 
+                        {% if search %}
+                        <small class="text-muted">(filtered by "{{ search }}")</small>
+                        {% endif %}
+                        {% if status != 'all' %}
+                        <small class="text-muted">({{ status }} only)</small>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if contests.items %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Contest Name</th>
+                                    <th>Creator</th>
+                                    <th>Status</th>
+                                    <th>Lock Time</th>
+                                    <th>Entries</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contest in contests.items %}
+                                <tr>
+                                    <td>{{ contest.contest_id }}</td>
+                                    <td>
+                                        <strong>{{ contest.contest_name }}</strong>
+                                        {% if contest.description %}
+                                        <br><small class="text-muted">{{ contest.description[:50] }}{% if contest.description|length > 50 %}...{% endif %}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if contest.creator %}
+                                        {{ contest.creator.username }}
+                                        {% else %}
+                                        <span class="text-muted">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if contest.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                        
+                                        {% if contest.lock_timestamp %}
+                                            {% if contest.lock_timestamp < current_utc %}
+                                            <br><span class="badge bg-warning text-dark mt-1">Locked</span>
+                                            {% else %}
+                                            <br><span class="badge bg-info text-dark mt-1">Unlocked</span>
+                                            {% endif %}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if contest.lock_timestamp %}
+                                        <small>{{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ contest.entries.count() }}</span>
+                                    </td>
+                                    <td>
+                                        <small>{{ contest.created_at.strftime('%Y-%m-%d %H:%M') if contest.created_at else '-' }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{{ url_for('admin.view_contest_entries', contest_id=contest.contest_id) }}" 
+                                               class="btn btn-outline-info" title="View Entries">
+                                                <i class="fas fa-list"></i>
+                                            </a>
+                                            <a href="{{ url_for('admin.edit_contest', contest_id=contest.contest_id) }}" 
+                                               class="btn btn-outline-primary" title="Edit Contest">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% if contest.lock_timestamp < current_utc %}
+                                            <a href="{{ url_for('admin.set_contest_answers', contest_id=contest.contest_id) }}" 
+                                               class="btn btn-outline-secondary" title="Set Answers">
+                                                <i class="fas fa-check-circle"></i>
+                                            </a>
+                                            {% endif %}
+                                            <button type="button" class="btn btn-outline-{{ 'warning' if contest.is_active else 'success' }} toggle-active-btn"
+                                                    title="{{ 'Deactivate' if contest.is_active else 'Activate' }} Contest"
+                                                    data-contest-id="{{ contest.contest_id }}"
+                                                    data-current-status="{{ contest.is_active|lower }}">
+                                                <i class="fas fa-{{ 'pause' if contest.is_active else 'play' }}"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-outline-danger delete-contest-btn"
+                                                    title="Delete Contest"
+                                                    data-contest-id="{{ contest.contest_id }}"
+                                                    data-contest-name="{{ contest.contest_name }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    {% if contests.pages > 1 %}
+                    <nav aria-label="Contests pagination" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            {% if contests.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.manage_contests', page=contests.prev_num, search=search, status=status) }}">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                            {% endif %}
+
+                            {% for page_num in contests.iter_pages() %}
+                                {% if page_num %}
+                                    {% if page_num != contests.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('admin.manage_contests', page=page_num, search=search, status=status) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                    {% else %}
+                                    <li class="page-item active">
+                                        <span class="page-link">{{ page_num }}</span>
+                                    </li>
+                                    {% endif %}
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if contests.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.manage_contests', page=contests.next_num, search=search, status=status) }}">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+
+                    <div class="text-center text-muted">
+                        <small>
+                            Showing {{ contests.per_page * (contests.page - 1) + 1 }} to 
+                            {{ contests.per_page * (contests.page - 1) + contests.items|length }} of 
+                            {{ contests.total }} contests
+                        </small>
+                    </div>
+                    {% endif %}
+
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-trophy fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No contests found</h5>
+                        {% if search or status != 'all' %}
+                        <p class="text-muted">Try adjusting your search criteria or filters.</p>
+                        <a href="{{ url_for('admin.manage_contests') }}" class="btn btn-outline-primary">
+                            View All Contests
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle toggle active button clicks
+    document.querySelectorAll('.toggle-active-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var contestId = this.getAttribute('data-contest-id');
+            var currentStatus = this.getAttribute('data-current-status') === 'true';
+            
+            // Create a form and submit it (simpler approach without CSRF issues)
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/admin/contests/' + contestId + '/toggle-active';
+            form.style.display = 'none';
+            
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+
+    // Handle delete contest button clicks
+    document.querySelectorAll('.delete-contest-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var contestId = this.getAttribute('data-contest-id');
+            var contestName = this.getAttribute('data-contest-name');
+            
+            if (confirm('Are you sure you want to delete the contest "' + contestName + '"? This action cannot be undone and will delete all associated entries and questions.')) {
+                // Create a form and submit it
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/contests/' + contestId + '/delete';
+                
+                // Add CSRF token if available
+                var csrfToken = document.querySelector('meta[name=csrf-token]');
+                if (csrfToken) {
+                    var csrfInput = document.createElement('input');
+                    csrfInput.type = 'hidden';
+                    csrfInput.name = 'csrf_token';
+                    csrfInput.value = csrfToken.getAttribute('content');
+                    form.appendChild(csrfInput);
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Login - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-shield-lock"></i> Admin Login</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted text-center mb-4">
+                    Enter your admin credentials to access the admin panel.
+                </p>
+                
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control" + (" is-invalid" if form.username.errors else "")) }}
+                        {% if form.username.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.username.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control" + (" is-invalid" if form.password.errors else "")) }}
+                        {% if form.password.errors %}
+                            <div class="invalid-feedback">
+                                {% for error in form.password.errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+                
+                <hr class="my-4">
+                
+                <div class="text-center">
+                    <p class="mb-0">Regular user?</p>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-envelope"></i> Use Email Login
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info Card -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h6 class="card-title"><i class="bi bi-info-circle"></i> Admin Access</h6>
+                <ul class="small text-muted mb-0">
+                    <li>Admin accounts use username and password authentication</li>
+                    <li>Contact your system administrator if you need password assistance</li>
+                    <li>Admin accounts can also use email login as a backup</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

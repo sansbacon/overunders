@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Invite to Contest - {{ contest.contest_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="bi bi-envelope"></i> Send Invitations</h2>
+                    <h4 class="text-muted">{{ contest.contest_name }}</h4>
+                </div>
+                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Contest
+                </a>
+            </div>
+
+            <!-- Invitation Statistics -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-graph-up"></i> Invitation Statistics</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ invitation_stats.total_sent }}</h4>
+                            <small class="text-muted">Total Sent</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">{{ invitation_stats.email_sent }}</h4>
+                            <small class="text-muted">Email Invitations</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-info">{{ invitation_stats.sms_sent }}</h4>
+                            <small class="text-muted">SMS Invitations</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-warning">{{ invitation_stats.remaining }}</h4>
+                            <small class="text-muted">Remaining</small>
+                        </div>
+                    </div>
+                    {% if invitation_stats.remaining <= 10 %}
+                    <div class="alert alert-warning mt-3 mb-0">
+                        <i class="bi bi-exclamation-triangle"></i> 
+                        You have {{ invitation_stats.remaining }} invitations remaining out of 100 maximum per contest.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Contest Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> Contest Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Contest Name:</strong><br>{{ contest.contest_name }}</p>
+                            {% if contest.description %}
+                            <p><strong>Description:</strong><br>{{ contest.description }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Entry Deadline:</strong><br>
+                            <span class="text-danger fw-bold">{{ contest.lock_timestamp|to_central_time|strftime('%B %d, %Y at %I:%M %p Central Time') }}</span>
+                            </p>
+                            <p><strong>Questions:</strong> {{ contest.questions.count() }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invitation Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-send"></i> Send Invitations</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.email_addresses.label(class="form-label") }}
+                                    {{ form.email_addresses(class="form-control", rows="8") }}
+                                    <div class="form-text">
+                                        Enter email addresses separated by commas or one per line.<br>
+                                        Example: john@example.com, jane@example.com
+                                    </div>
+                                    {% if form.email_addresses.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.email_addresses.errors %}
+                                                <small>{{ error }}</small><br>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.phone_numbers.label(class="form-label") }}
+                                    {{ form.phone_numbers(class="form-control", rows="8") }}
+                                    <div class="form-text">
+                                        Enter phone numbers separated by commas or one per line.<br>
+                                        Example: (555) 123-4567, 555-987-6543<br>
+                                        <small class="text-muted">Note: SMS functionality is currently in development</small>
+                                    </div>
+                                    {% if form.phone_numbers.errors %}
+                                        <div class="text-danger">
+                                            {% for error in form.phone_numbers.errors %}
+                                                <small>{{ error }}</small><br>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Email Preview -->
+                        <div class="card bg-light mb-3">
+                            <div class="card-header">
+                                <h6 class="mb-0"><i class="bi bi-eye"></i> Email Preview</h6>
+                            </div>
+                            <div class="card-body">
+                                <p><strong>Subject:</strong> You're invited to join '{{ contest.contest_name }}' contest!</p>
+                                <p><strong>Key Points Included:</strong></p>
+                                <ul class="small">
+                                    <li>Contest details and description</li>
+                                    <li>How Over-Under contests work</li>
+                                    <li><strong>Entry deadline in bold: {{ contest.lock_timestamp|to_central_time|strftime('%B %d, %Y at %I:%M %p Central Time') }}</strong></li>
+                                    <li>Direct link to contest</li>
+                                    <li>Registration instructions for new users</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- Copyable Invitation Text -->
+                        <div class="card bg-info bg-opacity-10 mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="bi bi-clipboard"></i> Copy Invitation Text</h6>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="copyInvitationText()">
+                                    <i class="bi bi-clipboard"></i> Copy Text
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <p class="small text-muted mb-2">Use this text for social media, SMS, or manual emails:</p>
+                                <textarea id="invitationText" class="form-control" rows="12" readonly style="font-family: monospace; font-size: 0.9em;">🎯 Contest Invitation!
+
+{{ current_user.get_display_name() if current_user else 'Someone' }} has invited you to participate in an exciting Over-Under contest!
+
+Contest: {{ contest.contest_name }}
+{% if contest.description %}Description: {{ contest.description }}
+{% endif %}
+How it works: You'll predict Yes/No answers to a series of questions. After the contest locks, correct answers are revealed and scores are calculated based on how many you got right.
+
+⏰ IMPORTANT - Entry Deadline:
+{{ contest.lock_timestamp|to_central_time|strftime('%B %d, %Y at %I:%M %p Central Time') }}
+
+Ready to play? Join here:
+{{ url_for('contests.view_contest', contest_id=contest.contest_id, _external=True) }}
+
+If you don't have an account, you can register with just your email - no password required!
+
+Good luck and have fun!
+Over-Under Contests</textarea>
+                                <div class="alert alert-info mt-2 mb-0">
+                                    <i class="bi bi-info-circle"></i> 
+                                    <small>This text is identical to what recipients receive via email, formatted for easy copying and pasting.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                {% if invitation_stats.remaining > 0 %}
+                                {{ form.submit(class="btn btn-primary") }}
+                                {% else %}
+                                <button type="button" class="btn btn-secondary" disabled>
+                                    <i class="bi bi-x-circle"></i> Invitation Limit Reached
+                                </button>
+                                {% endif %}
+                                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="btn btn-outline-secondary">Cancel</a>
+                            </div>
+                            <div class="text-muted small">
+                                Maximum 100 invitations per contest
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-question-circle"></i> How Invitations Work</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Email Invitations</h6>
+                            <ul class="small">
+                                <li>Recipients get a detailed email with contest information</li>
+                                <li>Includes explanation of how Over-Under contests work</li>
+                                <li>Entry deadline is highlighted in bold</li>
+                                <li>Direct link to join the contest</li>
+                                <li>No account required - can register with just email</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>SMS Invitations</h6>
+                            <ul class="small">
+                                <li>Short message with contest name and deadline</li>
+                                <li>Direct link to contest</li>
+                                <li>Perfect for quick mobile notifications</li>
+                                <li>Currently in development phase</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="bi bi-lightbulb"></i> 
+                        <strong>Tip:</strong> Send invitations early to give participants time to enter before the deadline!
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyInvitationText() {
+    const textArea = document.getElementById('invitationText');
+    textArea.select();
+    textArea.setSelectionRange(0, 99999); // For mobile devices
+    
+    try {
+        document.execCommand('copy');
+        
+        // Update button text temporarily
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+        
+    } catch (err) {
+        // Fallback for browsers that don't support execCommand
+        alert('Please manually select and copy the text above.');
+    }
+}
+</script>
+{% endblock %}
