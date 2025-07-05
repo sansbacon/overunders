@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}About - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1 class="mb-4">About Over-Under Contests</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">What is Over-Under Contests?</h5>
+                <p class="card-text">
+                    Over-Under Contests is a platform for creating and participating in Yes/No prediction contests. 
+                    Whether you're predicting sports outcomes, entertainment events, or any other binary questions, 
+                    our platform makes it easy to compete with friends and the community.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">How It Works</h5>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-plus-circle-fill text-primary" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">Create</h6>
+                            <p class="small">Set up contests with custom Yes/No questions and lock dates.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-people-fill text-success" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">Participate</h6>
+                            <p class="small">Join contests and make your predictions before the lock date.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="text-center">
+                            <i class="bi bi-trophy-fill text-warning" style="font-size: 2rem;"></i>
+                            <h6 class="mt-2">Compete</h6>
+                            <p class="small">See how you rank on the leaderboard after contests lock.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Features</h5>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Easy contest creation with custom questions</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Flexible lock dates for predictions</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Real-time leaderboards and scoring</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Email authentication for security</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Mobile-friendly responsive design</li>
+                    <li><i class="bi bi-check-circle text-success me-2"></i>Contest invitations via email</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Get Started</h5>
+                <p class="card-text">
+                    Ready to start creating or participating in contests? 
+                    {% if current_user %}
+                        You're already logged in and ready to go!
+                    {% else %}
+                        Register for an account to get started.
+                    {% endif %}
+                </p>
+                {% if not current_user %}
+                <a href="{{ url_for('auth.register') }}" class="btn btn-primary">
+                    <i class="bi bi-person-plus"></i> Register Now
+                </a>
+                <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </a>
+                {% else %}
+                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Create Contest
+                </a>
+                <a href="{{ url_for('contests.list_contests') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-list"></i> Browse Contests
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

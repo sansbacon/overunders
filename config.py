@@ -36,9 +36,10 @@ class DevelopmentConfig(Config):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DEV_DATABASE_URL') or \
         'sqlite:///over_under_dev.db'
     
-    # Server configuration for URL generation
-    SERVER_NAME = os.environ.get('SERVER_NAME') or 'localhost:5000'
-    PREFERRED_URL_SCHEME = 'http'
+    # Only set SERVER_NAME for local development if explicitly provided
+    if os.environ.get('SERVER_NAME'):
+        SERVER_NAME = os.environ.get('SERVER_NAME')
+        PREFERRED_URL_SCHEME = 'http'
 
 
 class ProductionConfig(Config):
@@ -51,6 +52,9 @@ class ProductionConfig(Config):
     # Handle Heroku postgres URL format
     if SQLALCHEMY_DATABASE_URI and SQLALCHEMY_DATABASE_URI.startswith('postgres://'):
         SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace('postgres://', 'postgresql://', 1)
+    
+    # Use HTTPS for production
+    PREFERRED_URL_SCHEME = 'https'
 
 
 class TestingConfig(Config):
@@ -65,5 +69,5 @@ config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig if os.environ.get('DATABASE_URL') else DevelopmentConfig
 }
