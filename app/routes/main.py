@@ -14,19 +14,46 @@ def index():
     Returns:
         Rendered template for home page
     """
-    # Get active contests, ordered by creation date (newest first)
-    page = request.args.get('page', 1, type=int)
-    per_page = 10
-    
-    contests = Contest.query.filter_by(is_active=True)\
-                          .order_by(Contest.created_at.desc())\
-                          .paginate(page=page, per_page=per_page, error_out=False)
-    
-    current_user = get_current_user()
-    
-    return render_template('index.html', 
-                         contests=contests, 
-                         current_user=current_user)
+    try:
+        # Get active contests, ordered by creation date (newest first)
+        page = request.args.get('page', 1, type=int)
+        per_page = 10
+        
+        contests = Contest.query.filter_by(is_active=True)\
+                              .order_by(Contest.created_at.desc())\
+                              .paginate(page=page, per_page=per_page, error_out=False)
+        
+        current_user = get_current_user()
+        
+        return render_template('index.html', 
+                             contests=contests, 
+                             current_user=current_user)
+    except Exception as e:
+        # Log the error and return a safe response
+        current_app.logger.error(f"Error in index route: {str(e)}")
+        current_user = get_current_user()
+        
+        # Create a mock pagination object for empty contests
+        class MockPagination:
+            def __init__(self):
+                self.items = []
+                self.page = 1
+                self.pages = 1
+                self.per_page = 10
+                self.total = 0
+                self.has_prev = False
+                self.has_next = False
+                self.prev_num = None
+                self.next_num = None
+            
+            def iter_pages(self):
+                return []
+        
+        contests = MockPagination()
+        
+        return render_template('index.html', 
+                             contests=contests, 
+                             current_user=current_user)
 
 
 @main.route('/about')
