@@ -1188,6 +1188,34 @@ def download_template(operation_type):
     )
 
 
+@admin.route('/check-admin-status')
+def check_admin_status():
+    """Check admin user status (for debugging).
+    
+    Returns:
+        JSON response with admin user information
+    """
+    try:
+        admin_count = User.query.filter_by(is_admin=True).count()
+        total_users = User.query.count()
+        
+        admin_users = User.query.filter_by(is_admin=True).all()
+        admin_list = [{'username': u.username, 'email': u.email} for u in admin_users]
+        
+        return jsonify({
+            'admin_users_count': admin_count,
+            'total_users': total_users,
+            'admin_users': admin_list,
+            'database_url': 'PostgreSQL' if 'postgres' in str(db.engine.url) else 'SQLite'
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'admin_users_count': 0,
+            'total_users': 0
+        })
+
+
 @admin.route('/create-admin-user', methods=['GET', 'POST'])
 def create_admin_user():
     """Create an admin user (accessible without authentication for initial setup).
@@ -1195,12 +1223,16 @@ def create_admin_user():
     Returns:
         Rendered template or redirect after creation
     """
-    # Check if any admin users already exist
-    existing_admin = User.query.filter_by(is_admin=True).first()
-    
-    if existing_admin:
-        flash('Admin user already exists. Please use the admin login page.', 'info')
-        return redirect(url_for('auth.admin_login'))
+    try:
+        # Check if any admin users already exist
+        existing_admin = User.query.filter_by(is_admin=True).first()
+        
+        if existing_admin:
+            flash('Admin user already exists. Please use the admin login page.', 'info')
+            return redirect(url_for('auth.admin_login'))
+    except Exception as e:
+        # If we can't query the database, continue with creation
+        flash(f'Database query failed: {str(e)}. Attempting to create admin user anyway.', 'warning')
     
     if request.method == 'POST':
         try:
