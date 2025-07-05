@@ -1186,3 +1186,57 @@ def download_template(operation_type):
         as_attachment=True,
         download_name=filename
     )
+
+
+@admin.route('/create-admin-user', methods=['GET', 'POST'])
+def create_admin_user():
+    """Create an admin user (accessible without authentication for initial setup).
+    
+    Returns:
+        Rendered template or redirect after creation
+    """
+    # Check if any admin users already exist
+    existing_admin = User.query.filter_by(is_admin=True).first()
+    
+    if existing_admin:
+        flash('Admin user already exists. Please use the admin login page.', 'info')
+        return redirect(url_for('auth.admin_login'))
+    
+    if request.method == 'POST':
+        try:
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            password = request.form.get('password', '')
+            
+            if not username or not email or not password:
+                flash('All fields are required.', 'error')
+                return render_template('admin/create_admin_user.html')
+            
+            # Check if username or email already exists
+            if User.query.filter_by(username=username).first():
+                flash('Username already exists.', 'error')
+                return render_template('admin/create_admin_user.html')
+            
+            if User.query.filter_by(email=email).first():
+                flash('Email already exists.', 'error')
+                return render_template('admin/create_admin_user.html')
+            
+            # Create admin user
+            admin_user = User(
+                username=username,
+                email=email,
+                is_admin=True
+            )
+            admin_user.set_password(password)
+            
+            db.session.add(admin_user)
+            db.session.commit()
+            
+            flash(f'Admin user "{username}" created successfully! You can now log in.', 'success')
+            return redirect(url_for('auth.admin_login'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating admin user: {str(e)}', 'error')
+    
+    return render_template('admin/create_admin_user.html')

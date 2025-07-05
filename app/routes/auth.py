@@ -79,48 +79,56 @@ def admin_login():
     form = AdminLoginForm()
     
     if form.validate_on_submit():
-        username = form.username.data.strip()
-        password = form.password.data
-        
-        # Find user by username
-        user = User.query.filter_by(username=username).first()
-        
-        if not user:
-            flash('Invalid username or password.', 'error')
+        try:
+            username = form.username.data.strip()
+            password = form.password.data
+            
+            # Find user by username
+            user = User.query.filter_by(username=username).first()
+            
+            if not user:
+                flash('Invalid username or password.', 'error')
+                return render_template('auth/admin_login.html', form=form)
+            
+            # Check if user is admin
+            if not user.is_admin:
+                flash('Access denied. Admin privileges required.', 'error')
+                return render_template('auth/admin_login.html', form=form)
+            
+            # Check if user has password set
+            if not user.has_password():
+                flash('No password set for this admin account. Please contact system administrator.', 'error')
+                return render_template('auth/admin_login.html', form=form)
+            
+            # Verify password
+            if not user.check_password(password):
+                flash('Invalid username or password.', 'error')
+                return render_template('auth/admin_login.html', form=form)
+            
+            # Update user's last login
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
+            # Log user in
+            session['user_id'] = user.user_id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            
+            flash(f'Welcome back, {user.username}!', 'success')
+            
+            # Redirect to next page if specified, otherwise to admin dashboard
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            
+            return redirect(url_for('admin.dashboard'))
+            
+        except Exception as e:
+            # Log the error and show a generic error message
+            from flask import current_app
+            current_app.logger.error(f"Error in admin login: {str(e)}")
+            flash('An error occurred during login. Please try again.', 'error')
             return render_template('auth/admin_login.html', form=form)
-        
-        # Check if user is admin
-        if not user.is_admin:
-            flash('Access denied. Admin privileges required.', 'error')
-            return render_template('auth/admin_login.html', form=form)
-        
-        # Check if user has password set
-        if not user.has_password():
-            flash('No password set for this admin account. Please contact system administrator.', 'error')
-            return render_template('auth/admin_login.html', form=form)
-        
-        # Verify password
-        if not user.check_password(password):
-            flash('Invalid username or password.', 'error')
-            return render_template('auth/admin_login.html', form=form)
-        
-        # Update user's last login
-        user.last_login = datetime.utcnow()
-        db.session.commit()
-        
-        # Log user in
-        session['user_id'] = user.user_id
-        session['username'] = user.username
-        session['is_admin'] = user.is_admin
-        
-        flash(f'Welcome back, {user.username}!', 'success')
-        
-        # Redirect to next page if specified, otherwise to admin dashboard
-        next_page = request.args.get('next')
-        if next_page:
-            return redirect(next_page)
-        
-        return redirect(url_for('admin.dashboard'))
     
     return render_template('auth/admin_login.html', form=form)
 
