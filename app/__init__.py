@@ -13,6 +13,10 @@ migrate = Migrate()
 mail = Mail()
 csrf = CSRFProtect()
 
+# OAuth will be initialized in create_app
+oauth = None
+google = None
+
 
 def create_app(config_name=None):
     """Create and configure Flask application.
@@ -34,6 +38,12 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     mail.init_app(app)
     csrf.init_app(app)
+    
+    # Initialize OAuth if Google credentials are provided
+    global oauth, google
+    if app.config.get('GOOGLE_CLIENT_ID') and app.config.get('GOOGLE_CLIENT_SECRET'):
+        from app.utils.oauth import init_oauth
+        oauth, google = init_oauth(app)
     
     # Register blueprints
     from app.routes.main import main as main_blueprint

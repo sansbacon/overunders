@@ -22,6 +22,13 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login = db.Column(db.DateTime, nullable=True)
     
+    # Google OAuth fields
+    google_id = db.Column(db.String(100), unique=True, nullable=True)
+    google_email = db.Column(db.String(120), nullable=True)
+    google_name = db.Column(db.String(100), nullable=True)
+    google_picture = db.Column(db.String(500), nullable=True)
+    auth_provider = db.Column(db.String(20), default='email', nullable=False)  # 'email', 'google'
+    
     # Relationships
     contests = db.relationship('Contest', backref='creator', lazy='dynamic')
     entries = db.relationship('ContestEntry', backref='user', lazy='dynamic')

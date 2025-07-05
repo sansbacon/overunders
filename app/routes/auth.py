@@ -4,9 +4,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, PasswordField
 from wtforms.validators import DataRequired, Email, Length
-from app import db
+from app import db, google
 from app.models import User, LoginToken
 from app.utils.email import send_login_email
+from app.utils.oauth import handle_google_callback
 
 auth = Blueprint('auth', __name__)
 
@@ -240,3 +241,76 @@ def resend_login():
     """
     flash('Please enter your email address to receive a new login link.', 'info')
     return redirect(url_for('auth.login'))
+
+
+@auth.route('/google-login')
+def google_login():
+    """Initiate Google OAuth login.
+    
+    Returns:
+        Redirect to Google OAuth authorization URL
+    """
+    from flask import current_app
+    
+    # Check if Google OAuth is configured
+    if not current_app.config.get('GOOGLE_CLIENT_ID') or not current_app.config.get('GOOGLE_CLIENT_SECRET'):
+        flash('Google login is not configured. Please contact the administrator.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    if not google:
+        flash('Google login service is not available. Please try again later.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    try:
+        redirect_uri = url_for('auth.google_callback', _external=True)
+        return google.authorize_redirect(redirect_uri)
+    except Exception as e:
+        current_app.logger.error(f"Google OAuth initialization error: {str(e)}")
+        flash('Google login is temporarily unavailable. Please use email login instead.', 'error')
+        return redirect(url_for('auth.login'))
+
+
+@auth.route('/google-callback')
+def google_callback():
+    """Handle Google OAuth callback.
+    
+    Returns:
+        Redirect to main page or login page with error
+    """
+    if not google:
+        flash('Google login is not configured.', 'error')
+        return redirect(url_for('auth.login'))
+    
+    try:
+        success, result = handle_google_callback(google, request)
+        
+        if success:
+            user = result
+            
+            # Update user's last login
+            user.last_login = datetime.utcnow()
+            db.session.commit()
+            
+            # Log user in
+            session['user_id'] = user.user_id
+            session['username'] = user.username
+            session['is_admin'] = user.is_admin
+            
+            flash(f'Welcome, {user.username}!', 'success')
+            
+            # Redirect to next page if specified, otherwise to main page
+            next_page = request.args.get('next')
+            if next_page:
+                return redirect(next_page)
+            
+            return redirect(url_for('main.index'))
+        else:
+            error_message = result
+            flash(f'Google login failed: {error_message}', 'error')
+            return redirect(url_for('auth.login'))
+            
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"Google OAuth callback error: {str(e)}")
+        flash('An error occurred during Google login. Please try again.', 'error')
+        return redirect(url_for('auth.login'))

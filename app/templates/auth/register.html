@@ -63,6 +63,15 @@
                 
                 <hr class="my-4">
                 
+                <!-- Google Login Button (only show if configured) -->
+                {% if config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET %}
+                <div class="d-grid mb-3">
+                    <a href="{{ url_for('auth.google_login') }}" class="btn btn-danger">
+                        <i class="bi bi-google"></i> Sign up with Google
+                    </a>
+                </div>
+                {% endif %}
+                
                 <div class="text-center">
                     <p class="mb-0">Already have an account?</p>
                     <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary btn-sm">

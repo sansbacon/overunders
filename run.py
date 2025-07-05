@@ -1,7 +1,11 @@
 """Main application runner for Over-Under Contests."""
 import os
+from dotenv import load_dotenv
 from app import create_app, db
 from app.models import User, Contest, Question, ContestEntry, EntryAnswer, LoginToken
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = create_app()
 
