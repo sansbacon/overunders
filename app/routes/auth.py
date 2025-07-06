@@ -30,6 +30,8 @@ class AdminLoginForm(FlaskForm):
 class RegisterForm(FlaskForm):
     """Form for user registration."""
     
+    first_name = StringField('First Name', validators=[DataRequired(), Length(min=1, max=50)])
+    last_name = StringField('Last Name', validators=[DataRequired(), Length(min=1, max=50)])
     username = StringField('Username', validators=[DataRequired()])
     email = StringField('Email', validators=[DataRequired(), Email()])
     mobile_phone = StringField('Mobile Phone (Optional)')
@@ -144,6 +146,8 @@ def register():
     form = RegisterForm()
     
     if form.validate_on_submit():
+        first_name = form.first_name.data.strip()
+        last_name = form.last_name.data.strip()
         username = form.username.data.strip()
         email = form.email.data.lower().strip()
         mobile_phone = form.mobile_phone.data.strip() if form.mobile_phone.data else None
@@ -160,6 +164,8 @@ def register():
         
         # Create new user
         user = User(
+            first_name=first_name,
+            last_name=last_name,
             username=username,
             email=email,
             mobile_phone=mobile_phone

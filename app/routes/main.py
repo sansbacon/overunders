@@ -1,10 +1,23 @@
 """Main routes for the Over-Under Contests application."""
-from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, send_from_directory, current_app, flash
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField
+from wtforms.validators import Length, Optional
+from app import db
 from app.models import Contest, User
-from app.utils.decorators import get_current_user
+from app.utils.decorators import get_current_user, login_required
 import os
 
 main = Blueprint('main', __name__)
+
+
+class EditProfileForm(FlaskForm):
+    """Form for editing user profile information."""
+    
+    first_name = StringField('First Name', validators=[Optional(), Length(max=50)])
+    last_name = StringField('Last Name', validators=[Optional(), Length(max=50)])
+    mobile_phone = StringField('Mobile Phone', validators=[Optional(), Length(max=20)])
+    submit = SubmitField('Update Profile')
 
 
 @main.route('/')
@@ -87,6 +100,37 @@ def profile():
                          user=current_user,
                          created_contests=created_contests,
                          contest_entries=contest_entries)
+
+
+@main.route('/profile/edit', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    """Edit user profile information.
+    
+    Returns:
+        Rendered template for profile editing or redirect after update
+    """
+    current_user = get_current_user()
+    form = EditProfileForm()
+    
+    if request.method == 'GET':
+        # Pre-populate form with current user data
+        form.first_name.data = current_user.first_name
+        form.last_name.data = current_user.last_name
+        form.mobile_phone.data = current_user.mobile_phone
+    
+    if form.validate_on_submit():
+        # Update user information
+        current_user.first_name = form.first_name.data.strip() if form.first_name.data else None
+        current_user.last_name = form.last_name.data.strip() if form.last_name.data else None
+        current_user.mobile_phone = form.mobile_phone.data.strip() if form.mobile_phone.data else None
+        
+        db.session.commit()
+        
+        flash('Profile updated successfully!', 'success')
+        return redirect(url_for('main.profile'))
+    
+    return render_template('edit_profile.html', form=form, user=current_user)
 
 
 @main.route('/favicon.ico')

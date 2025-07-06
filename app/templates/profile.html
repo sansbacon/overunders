@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <!-- User Profile Information -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4><i class="bi bi-person-circle"></i> Profile Information</h4>
+                <a href="{{ url_for('main.edit_profile') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil"></i> Edit Profile
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 text-center">
+                        {% if user.google_picture %}
+                            <img src="{{ user.google_picture }}" alt="Profile Picture" class="rounded-circle mb-3" style="width: 100px; height: 100px;">
+                        {% else %}
+                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 100px; height: 100px;">
+                                <i class="bi bi-person-fill text-white" style="font-size: 3rem;"></i>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-9">
+                        <h5>{{ user.username }}</h5>
+                        
+                        {% if user.get_full_name() %}
+                            <p class="text-muted mb-1">
+                                <i class="bi bi-person"></i> {{ user.get_full_name() }}
+                            </p>
+                        {% endif %}
+                        
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-envelope"></i> {{ user.email }}
+                        </p>
+                        
+                        {% if user.mobile_phone %}
+                            <p class="text-muted mb-1">
+                                <i class="bi bi-phone"></i> {{ user.mobile_phone }}
+                            </p>
+                        {% endif %}
+                        
+                        <p class="text-muted mb-1">
+                            <i class="bi bi-calendar"></i> Member since {{ user.created_at.strftime('%B %d, %Y') }}
+                        </p>
+                        
+                        {% if user.last_login %}
+                            <p class="text-muted mb-1">
+                                <i class="bi bi-clock"></i> Last login: {{ user.last_login.strftime('%B %d, %Y at %I:%M %p') }}
+                            </p>
+                        {% endif %}
+                        
+                        {% if user.auth_provider == 'google' %}
+                            <span class="badge bg-danger">
+                                <i class="bi bi-google"></i> Google Account
+                            </span>
+                        {% else %}
+                            <span class="badge bg-primary">
+                                <i class="bi bi-envelope"></i> Email Account
+                            </span>
+                        {% endif %}
+                        
+                        {% if user.is_admin %}
+                            <span class="badge bg-warning">
+                                <i class="bi bi-shield-check"></i> Administrator
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Statistics -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-bar-chart"></i> Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <div class="border-end">
+                            <h3 class="text-primary">{{ created_contests|length }}</h3>
+                            <p class="text-muted mb-0">Contests Created</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="border-end">
+                            <h3 class="text-success">{{ contest_entries|length }}</h3>
+                            <p class="text-muted mb-0">Contests Entered</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="text-info">{{ (created_contests|length + contest_entries|length) }}</h3>
+                        <p class="text-muted mb-0">Total Activity</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Created Contests -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-trophy"></i> Contests You Created</h5>
+                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-circle"></i> Create New Contest
+                </a>
+            </div>
+            <div class="card-body">
+                {% if created_contests %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Contest Name</th>
+                                    <th>Created</th>
+                                    <th>Lock Date</th>
+                                    <th>Entries</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contest in created_contests %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('contests.detail', contest_id=contest.contest_id) }}" class="text-decoration-none">
+                                            {{ contest.contest_name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ contest.created_at.strftime('%m/%d/%Y') }}</td>
+                                    <td>{{ contest.lock_timestamp.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ contest.entries.count() }}</span>
+                                    </td>
+                                    <td>
+                                        {% if contest.is_locked() %}
+                                            <span class="badge bg-danger">Locked</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Open</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('contests.detail', contest_id=contest.contest_id) }}" class="btn btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            {% if not contest.is_locked() %}
+                                                <a href="{{ url_for('contests.edit', contest_id=contest.contest_id) }}" class="btn btn-outline-secondary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-trophy text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">No Contests Created Yet</h5>
+                        <p class="text-muted">Create your first contest to get started!</p>
+                        <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Create Your First Contest
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Contest Entries -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i class="bi bi-list-check"></i> Your Contest Entries</h5>
+            </div>
+            <div class="card-body">
+                {% if contest_entries %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Contest Name</th>
+                                    <th>Entered</th>
+                                    <th>Lock Date</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in contest_entries %}
+                                {% set score_data = entry.calculate_score() %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('contests.detail', contest_id=entry.contest.contest_id) }}" class="text-decoration-none">
+                                            {{ entry.contest.contest_name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ entry.created_at.strftime('%m/%d/%Y') }}</td>
+                                    <td>{{ entry.contest.lock_timestamp.strftime('%m/%d/%Y %I:%M %p') }}</td>
+                                    <td>
+                                        {% if score_data.answered_questions > 0 %}
+                                            <span class="badge bg-primary">
+                                                {{ score_data.correct_answers }}/{{ score_data.answered_questions }}
+                                                ({{ score_data.percentage }}%)
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No scores yet</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if entry.contest.is_locked() %}
+                                            <span class="badge bg-danger">Locked</span>
+                                        {% else %}
+                                            <span class="badge bg-success">Open</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('contests.detail', contest_id=entry.contest.contest_id) }}" class="btn btn-outline-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            {% if not entry.contest.is_locked() %}
+                                                <a href="{{ url_for('contests.entry_form', contest_id=entry.contest.contest_id) }}" class="btn btn-outline-secondary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-list-check text-muted" style="font-size: 3rem;"></i>
+                        <h5 class="text-muted mt-3">No Contest Entries Yet</h5>
+                        <p class="text-muted">Join a contest to start making predictions!</p>
+                        <a href="{{ url_for('contests.list_contests') }}" class="btn btn-success">
+                            <i class="bi bi-search"></i> Browse Contests
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6><i class="bi bi-lightning"></i> Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Contest
+                    </a>
+                    <a href="{{ url_for('contests.list_contests') }}" class="btn btn-success">
+                        <i class="bi bi-search"></i> Browse Contests
+                    </a>
+                    <a href="{{ url_for('contests.my_contests') }}" class="btn btn-info">
+                        <i class="bi bi-person-check"></i> My Contests
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="bi bi-clock-history"></i> Recent Activity</h6>
+            </div>
+            <div class="card-body">
+                {% if created_contests or contest_entries %}
+                    <div class="list-group list-group-flush">
+                        <!-- Show recent created contests -->
+                        {% for contest in created_contests[:3] %}
+                            <div class="list-group-item border-0 px-0">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-trophy text-primary me-2"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted">Created contest</small>
+                                        <div class="fw-bold">{{ contest.contest_name }}</div>
+                                        <small class="text-muted">{{ contest.created_at.strftime('%m/%d/%Y') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        
+                        <!-- Show recent contest entries -->
+                        {% for entry in contest_entries[:3] %}
+                            <div class="list-group-item border-0 px-0">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-check-circle text-success me-2"></i>
+                                    <div class="flex-grow-1">
+                                        <small class="text-muted">Entered contest</small>
+                                        <div class="fw-bold">{{ entry.contest.contest_name }}</div>
+                                        <small class="text-muted">{{ entry.created_at.strftime('%m/%d/%Y') }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center mb-0">No recent activity</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
