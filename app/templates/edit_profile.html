@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Profile - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="bi bi-person-gear"></i> Edit Profile</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="first_name" class="form-label">First Name</label>
+                            {{ form.first_name(class="form-control") }}
+                            {% if form.first_name.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.first_name.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            {{ form.last_name(class="form-control") }}
+                            {% if form.last_name.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.last_name.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="mobile_phone" class="form-label">Mobile Phone</label>
+                        {{ form.mobile_phone(class="form-control", placeholder="Optional - for SMS notifications") }}
+                        {% if form.mobile_phone.errors %}
+                            <div class="text-danger">
+                                {% for error in form.mobile_phone.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 
+                            Your mobile phone number is optional and will only be used for contest notifications if you choose to enable SMS alerts.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Account Information</label>
+                        <div class="bg-light p-3 rounded">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Username:</strong> {{ user.username }}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Email:</strong> {{ user.email }}
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-6">
+                                    <strong>Account Type:</strong>
+                                    {% if user.auth_provider == 'google' %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-google"></i> Google Account
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-primary">
+                                            <i class="bi bi-envelope"></i> Email Account
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-text">
+                            <i class="bi bi-lock"></i> 
+                            Username and email cannot be changed. Contact support if you need to update these fields.
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('main.profile') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Profile
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Update Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        {% if user.auth_provider == 'google' %}
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> Google Account Information</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <i class="bi bi-google"></i> 
+                    You signed up using your Google account. Your name and email are managed by Google.
+                </p>
+                <p class="mb-0">
+                    <i class="bi bi-phone"></i> 
+                    You can add or update your mobile phone number above for SMS notifications about contests.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
