@@ -45,6 +45,10 @@ def create_app(config_name=None):
         from app.utils.oauth import init_oauth
         oauth, google = init_oauth(app)
     
+    # Initialize monitoring and error handling
+    from app.utils.monitoring import error_handler
+    error_handler.init_app(app)
+    
     # Register blueprints
     from app.routes.main import main as main_blueprint
     app.register_blueprint(main_blueprint)
@@ -57,6 +61,9 @@ def create_app(config_name=None):
     
     from app.routes.admin import admin as admin_blueprint
     app.register_blueprint(admin_blueprint, url_prefix='/admin')
+    
+    from app.routes.health import health as health_blueprint
+    app.register_blueprint(health_blueprint)
     
     # Register template filters
     from app.utils.timezone import convert_from_utc

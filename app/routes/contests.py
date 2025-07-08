@@ -89,9 +89,9 @@ def view_contest(contest_id):
             user_id=current_user.user_id
         ).first()
     
-    # Get leaderboard if contest is locked
+    # Get leaderboard if contest is locked and all answers have been set
     leaderboard = None
-    if contest.is_locked():
+    if contest.is_locked() and contest.has_all_answers():
         leaderboard = contest.get_leaderboard()
     
     questions = contest.get_questions_ordered()
@@ -351,7 +351,11 @@ def leaderboard(contest_id):
         flash('Leaderboard will be available after the contest is locked.', 'info')
         return redirect(url_for('contests.view_contest', contest_id=contest_id))
     
-    leaderboard = contest.get_leaderboard()
+    # Only show leaderboard if all answers have been set
+    leaderboard = None
+    if contest.has_all_answers():
+        leaderboard = contest.get_leaderboard()
+    
     questions = contest.get_questions_ordered()
     
     return render_template('contests/leaderboard.html',
@@ -534,6 +538,77 @@ def update_answer(contest_id, question_id):
             'answer_set_at': question.answer_set_at.isoformat() if question.answer_set_at else None
         })
     
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@contests.route('/<int:contest_id>/autosave-entry', methods=['POST'])
+@login_required
+def autosave_entry(contest_id):
+    """Auto-save contest entry data.
+    
+    Args:
+        contest_id (int): Contest ID
+        
+    Returns:
+        JSON response indicating success or failure
+    """
+    try:
+        contest = Contest.query.get_or_404(contest_id)
+        current_user = get_current_user()
+        
+        # Check if contest is locked
+        if contest.is_locked():
+            return jsonify({'error': 'Contest is locked'}), 400
+        
+        # Get or create entry
+        entry = ContestEntry.query.filter_by(
+            contest_id=contest_id,
+            user_id=current_user.user_id
+        ).first()
+        
+        if not entry:
+            entry = ContestEntry(
+                contest_id=contest_id,
+                user_id=current_user.user_id
+            )
+            db.session.add(entry)
+            db.session.flush()
+        
+        # Get form data
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Save answers
+        questions = contest.get_questions_ordered()
+        for question in questions:
+            answer_key = f'question_{question.question_id}'
+            if answer_key in data:
+                user_answer = data[answer_key] == 'True'
+                
+                # Get or create answer
+                answer = EntryAnswer.query.filter_by(
+                    entry_id=entry.entry_id,
+                    question_id=question.question_id
+                ).first()
+                
+                if answer:
+                    answer.user_answer = user_answer
+                else:
+                    answer = EntryAnswer(
+                        entry_id=entry.entry_id,
+                        question_id=question.question_id,
+                        user_answer=user_answer
+                    )
+                    db.session.add(answer)
+        
+        entry.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': 'Entry auto-saved'})
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500

@@ -214,12 +214,75 @@ function timeUntil(dateString) {
     }
 }
 
+// Loading overlay functionality
+function showLoadingOverlay(message = 'Loading...') {
+    let overlay = document.getElementById('loading-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-overlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-spinner">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div id="loading-message">${message}</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    } else {
+        document.getElementById('loading-message').textContent = message;
+    }
+    
+    setTimeout(() => overlay.classList.add('show'), 10);
+    return overlay;
+}
+
+function hideLoadingOverlay() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) {
+        overlay.classList.remove('show');
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }, 300);
+    }
+}
+
+// Enhanced form submission with loading states
+function enhanceFormSubmission() {
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn && !submitBtn.hasAttribute('data-no-loading')) {
+                const originalText = submitBtn.innerHTML;
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Processing...';
+                
+                // Re-enable button after 10 seconds as fallback
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }, 10000);
+            }
+        });
+    });
+}
+
+// Initialize enhanced features
+document.addEventListener('DOMContentLoaded', function() {
+    enhanceFormSubmission();
+});
+
 // Export functions for use in templates
 window.OverUnderContests = {
     updateEntryProgress,
     toggleContestActive,
     showLoading,
     hideLoading,
+    showLoadingOverlay,
+    hideLoadingOverlay,
     validateEmail,
     validateUsername,
     formatDateTime,

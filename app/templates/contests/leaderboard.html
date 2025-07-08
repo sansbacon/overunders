@@ -104,6 +104,17 @@
                                     </tbody>
                                 </table>
                             </div>
+                            {% elif contest.has_entries() %}
+                            <div class="text-center py-5">
+                                <i class="bi bi-hourglass-split display-1 text-warning mb-3"></i>
+                                <h5 class="text-warning">Results Pending</h5>
+                                <p class="text-muted">Contest results will be available once the contest owner has entered the correct answers.</p>
+                                {% if contest.get_questions_without_answers()|length > 0 %}
+                                <p class="text-muted">
+                                    <small>{{ contest.get_questions_without_answers()|length }} of {{ questions|length }} questions still need answers.</small>
+                                </p>
+                                {% endif %}
+                            </div>
                             {% else %}
                             <div class="text-center py-4">
                                 <i class="bi bi-people display-1 text-muted mb-3"></i>
@@ -124,7 +135,7 @@
                         </div>
                         <div class="card-body">
                             <p><strong>Total Questions:</strong> {{ questions|length }}</p>
-                            <p><strong>Total Entries:</strong> {{ leaderboard|length }}</p>
+                            <p><strong>Total Entries:</strong> {{ contest.entries.count() }}</p>
                             <p><strong>Contest Locked:</strong><br>
                             <small>{{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') if contest.lock_timestamp else 'Unknown' }}</small>
                             </p>
