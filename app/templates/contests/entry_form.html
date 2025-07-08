@@ -27,12 +27,19 @@
                         <strong>Contest locks at:</strong> 
                         {% if contest.lock_timestamp %}
                         {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') }}
+                        <br><small>Time remaining: 
+                            <span class="countdown-timer" 
+                                  data-countdown="{{ contest.lock_timestamp.isoformat() }}Z"
+                                  data-countdown-format="verbose">
+                                Loading...
+                            </span>
+                        </small>
                         {% else %}
                         Not set
                         {% endif %}
                     </div>
 
-                    <form method="POST" id="entry-form" data-is-update="{% if entry.entry_id %}true{% else %}false{% endif %}">
+                    <form method="POST" id="entry-form" data-contest-id="{{ contest.contest_id }}" data-is-update="{% if entry.entry_id %}true{% else %}false{% endif %}">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-4">
                             <h5 class="border-bottom pb-2">Questions</h5>

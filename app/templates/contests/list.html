@@ -16,10 +16,13 @@
             </div>
 
             {% if contests.items %}
-            <div class="row">
+            <div class="row" id="contests-container">
                 {% for contest in contests.items %}
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100">
+                    <div class="card h-100 contest-card" 
+                         {% if current_user and current_user.user_id == contest.created_by_user %}data-my-contest="true"{% endif %}
+                         {% if current_user and contest.entries.filter_by(user_id=current_user.user_id).first() %}data-entered="true"{% endif %}
+                         {% if contest.is_locked() and contest.has_all_answers() %}data-has-results="true"{% endif %}>
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="card-title mb-0">{{ contest.contest_name }}</h5>
                             {% if contest.is_locked() %}

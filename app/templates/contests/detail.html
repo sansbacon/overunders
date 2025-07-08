@@ -45,6 +45,15 @@
                                     <p><strong>Lock Time:</strong><br>
                                     {% if contest.lock_timestamp %}
                                     {{ contest.lock_timestamp.strftime('%Y-%m-%d %H:%M UTC') }}
+                                    {% if not contest.is_locked() %}
+                                    <br><small class="text-muted">Time remaining: 
+                                        <span class="countdown-timer" 
+                                              data-countdown="{{ contest.lock_timestamp.isoformat() }}Z"
+                                              data-countdown-format="compact">
+                                            Loading...
+                                        </span>
+                                    </small>
+                                    {% endif %}
                                     {% else %}
                                     <span class="text-muted">Not set</span>
                                     {% endif %}

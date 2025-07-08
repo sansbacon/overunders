@@ -1,5 +1,6 @@
 """Application configuration module."""
 import os
+import logging
 from datetime import timedelta
 
 
@@ -8,6 +9,26 @@ class Config:
     
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    
+    # Logging configuration
+    LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    LOG_TO_STDOUT = os.environ.get('LOG_TO_STDOUT', 'false').lower() in ['true', 'on', '1']
+    
+    # Error monitoring
+    SENTRY_DSN = os.environ.get('SENTRY_DSN')
+    ENABLE_ERROR_MONITORING = os.environ.get('ENABLE_ERROR_MONITORING', 'false').lower() in ['true', 'on', '1']
+    
+    # Health check configuration
+    HEALTH_CHECK_ENABLED = True
+    DATABASE_HEALTH_CHECK_TIMEOUT = 5  # seconds
+    
+    # Rate limiting
+    RATELIMIT_STORAGE_URL = os.environ.get('REDIS_URL') or 'memory://'
+    RATELIMIT_DEFAULT = "100 per hour"
+    
+    # Performance monitoring
+    ENABLE_PROFILING = os.environ.get('ENABLE_PROFILING', 'false').lower() in ['true', 'on', '1']
+    SLOW_QUERY_THRESHOLD = float(os.environ.get('SLOW_QUERY_THRESHOLD', '0.5'))
     
     # Email configuration
     MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'smtp.gmail.com'
