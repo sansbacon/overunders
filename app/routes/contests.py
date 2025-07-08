@@ -89,9 +89,9 @@ def view_contest(contest_id):
             user_id=current_user.user_id
         ).first()
     
-    # Get leaderboard if contest is locked
+    # Get leaderboard if contest is locked and all answers have been set
     leaderboard = None
-    if contest.is_locked():
+    if contest.is_locked() and contest.has_all_answers():
         leaderboard = contest.get_leaderboard()
     
     questions = contest.get_questions_ordered()
@@ -351,7 +351,11 @@ def leaderboard(contest_id):
         flash('Leaderboard will be available after the contest is locked.', 'info')
         return redirect(url_for('contests.view_contest', contest_id=contest_id))
     
-    leaderboard = contest.get_leaderboard()
+    # Only show leaderboard if all answers have been set
+    leaderboard = None
+    if contest.has_all_answers():
+        leaderboard = contest.get_leaderboard()
+    
     questions = contest.get_questions_ordered()
     
     return render_template('contests/leaderboard.html',
