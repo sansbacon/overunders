@@ -2,13 +2,14 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, DateTimeLocalField, FieldList, FormField, BooleanField, SubmitField, SelectField
-from wtforms.validators import DataRequired, Length
+from wtforms import StringField, TextAreaField, DateTimeLocalField, FieldList, FormField, BooleanField, SubmitField, SelectField, IntegerField
+from wtforms.validators import DataRequired, Length, Optional, NumberRange
 from app import db
 from app.models import Contest, Question, ContestEntry, EntryAnswer, User
 from app.utils.decorators import login_required, contest_owner_required, get_current_user
 from app.utils.timezone import get_timezone_choices, convert_to_utc, convert_from_utc, get_user_timezone
 from app.utils.invitations import send_bulk_invitations
+from app.utils.ai_generation import generate_nfl_contest, generate_contest_name_and_description, get_suggested_lock_time, ContestGenerationError
 
 contests = Blueprint('contests', __name__)
 
@@ -46,6 +47,28 @@ class InvitationForm(FlaskForm):
                                  validators=[Length(max=1000)],
                                  render_kw={'placeholder': 'Enter phone numbers, one per line or separated by commas'})
     submit = SubmitField('Send Invitations')
+
+
+class AutoGenerateForm(FlaskForm):
+    """Form for auto-generating contests."""
+    
+    sport = SelectField('Sport', 
+                       choices=[('NFL', 'NFL')], 
+                       default='NFL',
+                       validators=[DataRequired()])
+    question_count = IntegerField('Number of Questions', 
+                                 validators=[DataRequired(), NumberRange(min=1, max=10)],
+                                 default=5,
+                                 render_kw={'min': '1', 'max': '10'})
+    week_number = IntegerField('Week Number', 
+                              validators=[Optional(), NumberRange(min=1, max=18)],
+                              render_kw={'placeholder': 'Leave blank for current week'})
+    season_year = IntegerField('Season Year', 
+                              validators=[Optional(), NumberRange(min=2020, max=2030)],
+                              render_kw={'placeholder': 'Leave blank for current season'})
+    timezone = SelectField('Timezone', choices=get_timezone_choices(), default='US/Central')
+    accepted_questions = StringField('Accepted Questions', validators=[Optional()])
+    submit = SubmitField('Generate Contest')
 
 
 @contests.route('/')
@@ -114,6 +137,49 @@ def create_contest():
     """
     form = ContestForm()
     
+    # Check for AI-generated data in session
+    from flask import session
+    ai_generated_data = session.get('ai_generated_data', None)
+    is_ai_generated = False
+    
+    if request.method == 'GET' and ai_generated_data:
+        # Pre-populate form with AI-generated data
+        is_ai_generated = True
+        
+        # Set basic contest info
+        form.contest_name.data = ai_generated_data['contest_name']
+        form.description.data = ai_generated_data['description']
+        form.timezone.data = ai_generated_data['timezone']
+        
+        # Convert suggested lock time to local time for display
+        from datetime import datetime
+        suggested_lock_time = datetime.fromisoformat(ai_generated_data['suggested_lock_time'].replace('Z', '+00:00'))
+        local_lock_time = convert_from_utc(suggested_lock_time, ai_generated_data['timezone'])
+        form.lock_timestamp.data = local_lock_time
+        
+        # Clear existing questions and add AI-generated ones
+        while len(form.questions.entries) > 0:
+            form.questions.pop_entry()
+        
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"📝 Pre-populating {len(ai_generated_data['questions'])} questions:")
+        
+        for i, question_data in enumerate(ai_generated_data['questions']):
+            question_form = QuestionForm()
+            question_text = question_data['question']
+            question_form.question_text.data = question_text
+            form.questions.append_entry(question_form)
+            logger.info(f"   Question {i+1}: {question_text[:50]}...")
+        
+        # Ensure we have at least one question entry
+        if len(form.questions.entries) == 0:
+            logger.warning("No questions were added, adding empty question form")
+            form.questions.append_entry(QuestionForm())
+        
+        logger.info(f"✅ Form now has {len(form.questions.entries)} question entries")
+    
     if form.validate_on_submit():
         current_user = get_current_user()
         
@@ -127,7 +193,8 @@ def create_contest():
             contest_name=form.contest_name.data,
             description=form.description.data,
             created_by_user=current_user.user_id,
-            lock_timestamp=utc_lock_time
+            lock_timestamp=utc_lock_time,
+            is_ai_generated=ai_generated_data is not None
         )
         
         db.session.add(contest)
@@ -146,10 +213,21 @@ def create_contest():
         
         db.session.commit()
         
+        # Clear AI-generated data from session after successful creation
+        if ai_generated_data:
+            session.pop('ai_generated_data', None)
+        
         flash('Contest created successfully!', 'success')
         return redirect(url_for('contests.view_contest', contest_id=contest.contest_id))
     
-    return render_template('contests/form.html', form=form, title='Create Contest')
+    # Pass additional context for AI-generated contests
+    template_context = {
+        'form': form, 
+        'title': 'Create Contest',
+        'is_ai_generated': is_ai_generated
+    }
+    
+    return render_template('contests/form.html', **template_context)
 
 
 @contests.route('/<int:contest_id>/edit', methods=['GET', 'POST'])
@@ -690,3 +768,211 @@ def invite_to_contest(contest_id):
                          contest=contest, 
                          form=form,
                          invitation_stats=invitation_stats)
+
+
+@contests.route('/auto-generate', methods=['GET', 'POST'])
+@login_required
+def auto_generate():
+    """Auto-generate a contest using AI.
+    
+    Returns:
+        Rendered template for auto-generation form or redirect after creation
+    """
+    form = AutoGenerateForm()
+    current_user = get_current_user()
+    
+    # Check if user can create AI contests
+    if not current_user.can_create_ai_contest():
+        remaining = current_user.get_remaining_ai_contests_today()
+        flash(f'You have reached your daily limit of 3 AI-generated contests. You can create {remaining} more tomorrow.', 'error')
+        return redirect(url_for('contests.list_contests'))
+    
+    if form.validate_on_submit():
+        try:
+            # Double-check the limit before creating
+            if not current_user.can_create_ai_contest():
+                flash('You have reached your daily limit of AI-generated contests.', 'error')
+                return render_template('contests/auto_generate.html', form=form)
+            
+            sport = form.sport.data
+            question_count = form.question_count.data
+            week_number = form.week_number.data
+            season_year = form.season_year.data
+            timezone_str = form.timezone.data
+            
+            # Check if we have accepted questions from the preview modal
+            accepted_questions_json = form.accepted_questions.data
+            
+            # Debug logging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"✅ Auto-generate form submitted successfully!")
+            logger.info(f"   - Sport: {sport}")
+            logger.info(f"   - Question count: {question_count}")
+            logger.info(f"   - Week: {week_number}")
+            logger.info(f"   - Season: {season_year}")
+            logger.info(f"   - Timezone: {timezone_str}")
+            logger.info(f"   - Has accepted_questions: {bool(accepted_questions_json)}")
+            if accepted_questions_json:
+                logger.info(f"   - Accepted questions length: {len(accepted_questions_json)} chars")
+            
+            if accepted_questions_json:
+                # Use the accepted questions from the preview
+                import json
+                logger.info("Using accepted questions from preview modal")
+                accepted_data = json.loads(accepted_questions_json)
+                
+                # Store the generated data in session for the create form
+                from flask import session
+                session['ai_generated_data'] = {
+                    'contest_name': accepted_data['contest_name'],
+                    'description': accepted_data['description'],
+                    'suggested_lock_time': accepted_data['suggested_lock_time'],
+                    'questions': accepted_data['questions'],
+                    'timezone': timezone_str,
+                    'is_ai_generated': True
+                }
+                
+                flash('Questions generated successfully! Please review and customize the contest details below.', 'success')
+                return redirect(url_for('contests.create_contest'))
+            else:
+                # Generate new questions (fallback for direct form submission)
+                logger.info("Generating new questions (no accepted questions found)")
+                contest_info = generate_contest_name_and_description(
+                    sport=sport,
+                    week_number=week_number,
+                    season_year=season_year
+                )
+                
+                suggested_lock_time = get_suggested_lock_time(sport, week_number)
+                
+                # Generate questions based on sport
+                if sport.upper() == 'NFL':
+                    questions_data = generate_nfl_contest(week_number, season_year, question_count)
+                else:
+                    flash('Only NFL contests are currently supported for auto-generation.', 'error')
+                    return render_template('contests/auto_generate.html', form=form)
+                
+                # Store the generated data in session for the create form
+                from flask import session
+                session['ai_generated_data'] = {
+                    'contest_name': contest_info['name'],
+                    'description': contest_info['description'],
+                    'suggested_lock_time': suggested_lock_time.isoformat(),
+                    'questions': questions_data,
+                    'timezone': timezone_str,
+                    'is_ai_generated': True
+                }
+                
+                flash('Questions generated successfully! Please review and customize the contest details below.', 'success')
+                return redirect(url_for('contests.create_contest'))
+            
+        except ContestGenerationError as e:
+            flash(f'Failed to generate contest: {str(e)}', 'error')
+            return render_template('contests/auto_generate.html', form=form)
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'An unexpected error occurred: {str(e)}', 'error')
+            return render_template('contests/auto_generate.html', form=form)
+    
+    else:
+        # Form validation failed - add debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Form validation failed. Errors: {form.errors}")
+        logger.info(f"Form data keys: {list(request.form.keys())}")
+        logger.info(f"Request method: {request.method}")
+        
+        # Check if this was a submission with accepted questions
+        accepted_questions_json = request.form.get('accepted_questions')
+        if accepted_questions_json:
+            flash('There was an issue with the form submission. Please try again.', 'error')
+            logger.error(f"Form validation failed with accepted questions present")
+            logger.error(f"Accepted questions length: {len(accepted_questions_json)}")
+        else:
+            logger.info("No accepted questions found in form data")
+    
+    return render_template('contests/auto_generate.html', form=form)
+
+
+@contests.route('/preview-generation', methods=['POST'])
+@login_required
+def preview_generation():
+    """Preview auto-generated contest questions without creating the contest.
+    
+    Returns:
+        JSON response with generated questions
+    """
+    try:
+        data = request.get_json()
+        sport = data.get('sport', 'NFL')
+        question_count = data.get('question_count', 5)
+        week_number = data.get('week_number')
+        season_year = data.get('season_year')
+        
+        # Convert empty strings to None
+        if week_number == '':
+            week_number = None
+        if season_year == '':
+            season_year = None
+        
+        # Convert to integers if provided
+        if week_number is not None:
+            week_number = int(week_number)
+        if season_year is not None:
+            season_year = int(season_year)
+        if question_count is not None:
+            question_count = int(question_count)
+        
+        # Validate question count
+        if question_count < 1 or question_count > 10:
+            return jsonify({'error': 'Question count must be between 1 and 10'}), 400
+        
+        # Generate contest metadata
+        contest_info = generate_contest_name_and_description(
+            sport=sport,
+            week_number=week_number,
+            season_year=season_year
+        )
+        
+        # Generate questions based on sport
+        if sport.upper() == 'NFL':
+            questions_data = generate_nfl_contest(week_number, season_year, question_count)
+        else:
+            return jsonify({'error': 'Only NFL contests are currently supported'}), 400
+        
+        # Get suggested lock time
+        suggested_lock_time = get_suggested_lock_time(sport, week_number)
+        
+        return jsonify({
+            'success': True,
+            'contest_name': contest_info['name'],
+            'description': contest_info['description'],
+            'suggested_lock_time': suggested_lock_time.isoformat(),
+            'questions': questions_data
+        })
+        
+    except ContestGenerationError as e:
+        # Log detailed error information for debugging
+        import traceback
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.error(f"Contest generation error: {str(e)}")
+        logger.error(f"Request data: {data}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return jsonify({'error': str(e)}), 400
+    
+    except Exception as e:
+        # Log detailed error information for debugging
+        import traceback
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.error(f"Unexpected error in preview_generation: {str(e)}")
+        logger.error(f"Request data: {data}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500

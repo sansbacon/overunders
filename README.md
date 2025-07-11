@@ -6,6 +6,7 @@ A Flask web application for creating and managing over-under prediction contests
 
 - **User Authentication**: Passwordless login via email tokens
 - **Contest Management**: Create, edit, and manage prediction contests
+- **AI-Powered Auto-Generation**: Automatically generate NFL contests using OpenAI
 - **Entry System**: Submit predictions with over/under values
 - **Leaderboards**: Track scores and rankings
 - **Admin Panel**: Comprehensive administration interface
@@ -144,6 +145,13 @@ over-under-contests/
 - Contest administration
 - Email logs and monitoring
 - System information and statistics
+
+### AI-Powered Auto-Generation
+- Automatically generate NFL contest questions using OpenAI
+- Smart scheduling with appropriate lock times
+- Realistic betting scenarios (spreads and over/unders)
+- Preview generated questions before creating contests
+- Support for different NFL weeks and seasons
 
 ### Email System
 - Login token delivery

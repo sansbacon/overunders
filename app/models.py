@@ -110,6 +110,48 @@ class User(db.Model):
         if self.last_name:
             name_parts.append(self.last_name)
         return ' '.join(name_parts)
+    
+    def get_ai_contests_today(self) -> int:
+        """Get count of AI-generated contests created by this user today.
+        
+        Returns:
+            int: Number of AI-generated contests created today
+        """
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timedelta(days=1)
+        
+        return Contest.query.filter(
+            Contest.created_by_user == self.user_id,
+            Contest.is_ai_generated == True,
+            Contest.created_at >= today_start,
+            Contest.created_at < today_end
+        ).count()
+    
+    def can_create_ai_contest(self) -> bool:
+        """Check if user can create another AI-generated contest today.
+        
+        Returns:
+            bool: True if user can create AI contest, False otherwise
+        """
+        if self.is_admin:
+            return True
+        
+        daily_limit = 3
+        contests_today = self.get_ai_contests_today()
+        return contests_today < daily_limit
+    
+    def get_remaining_ai_contests_today(self) -> int:
+        """Get number of remaining AI contests user can create today.
+        
+        Returns:
+            int: Number of remaining AI contests for today
+        """
+        if self.is_admin:
+            return 999  # Unlimited for admins
+        
+        daily_limit = 3
+        contests_today = self.get_ai_contests_today()
+        return max(0, daily_limit - contests_today)
 
 
 class Contest(db.Model):
@@ -125,6 +167,7 @@ class Contest(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_ai_generated = db.Column(db.Boolean, default=False, nullable=False)
     
     # Relationships
     questions = db.relationship('Question', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
@@ -440,6 +483,64 @@ class EmailLog(db.Model):
         """String representation of ContestInvitation."""
         recipient = self.recipient_email or self.recipient_phone
         return f'<ContestInvitation {self.invitation_id}: {self.invitation_type} to {recipient}>'
+
+
+class NFLSchedule(db.Model):
+    """NFL schedule model for storing game schedules."""
+    
+    __tablename__ = 'nfl_schedules'
+    
+    schedule_id = db.Column(db.Integer, primary_key=True)
+    season_year = db.Column(db.Integer, nullable=False)
+    week_number = db.Column(db.Integer, nullable=False)
+    home_team = db.Column(db.String(50), nullable=False)
+    away_team = db.Column(db.String(50), nullable=False)
+    game_date = db.Column(db.DateTime, nullable=True)
+    game_time = db.Column(db.String(20), nullable=True)
+    is_playoff = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    def __repr__(self) -> str:
+        """String representation of NFLSchedule."""
+        return f'<NFLSchedule {self.season_year} Week {self.week_number}: {self.away_team} @ {self.home_team}>'
+    
+    @classmethod
+    def get_games_for_week(cls, season_year: int, week_number: int) -> List['NFLSchedule']:
+        """Get all games for a specific week.
+        
+        Args:
+            season_year (int): NFL season year
+            week_number (int): Week number (1-18)
+            
+        Returns:
+            List[NFLSchedule]: List of games for the week
+        """
+        return cls.query.filter_by(
+            season_year=season_year,
+            week_number=week_number
+        ).all()
+    
+    @classmethod
+    def get_matchup_string(cls, home_team: str, away_team: str) -> str:
+        """Get formatted matchup string.
+        
+        Args:
+            home_team (str): Home team name
+            away_team (str): Away team name
+            
+        Returns:
+            str: Formatted matchup (e.g., "Cowboys vs Eagles")
+        """
+        return f"{away_team} vs {home_team}"
+    
+    def get_matchup(self) -> str:
+        """Get formatted matchup string for this game.
+        
+        Returns:
+            str: Formatted matchup
+        """
+        return self.get_matchup_string(self.home_team, self.away_team)
 
 
 class LoginToken(db.Model):
