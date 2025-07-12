@@ -298,6 +298,143 @@ Requirements:
         raise ContestGenerationError(f"Unexpected error: {str(e)}")
 
 
+def generate_custom_contest(prompt: str, question_count: int = 5) -> List[Dict]:
+    """Generate contest questions using a custom user prompt.
+    
+    Args:
+        prompt (str): User-provided prompt describing the contest they want
+        question_count (int): Number of questions to generate (1-10, default 5)
+        
+    Returns:
+        List[Dict]: List of generated questions with metadata
+        
+    Raises:
+        ContestGenerationError: If generation fails
+    """
+    if not current_app.config.get('OPENAI_API_KEY'):
+        raise ContestGenerationError("OpenAI API key not configured")
+    
+    # Set up OpenAI API key
+    openai.api_key = current_app.config['OPENAI_API_KEY']
+    logger.info("OpenAI API key configured for custom contest generation")
+    
+    # Build the prompt for custom contest generation
+    system_prompt = f"""You are a contest creation assistant that generates yes/no prediction questions based on user prompts.
+
+IMPORTANT INSTRUCTIONS:
+1. Create exactly {question_count} yes/no questions based on the user's prompt
+2. Questions should be clear, unambiguous, and answerable with "Yes" or "No"
+3. Questions should be about future events that can be objectively verified
+4. Avoid questions about subjective opinions or matters of taste
+5. Make questions engaging and interesting for participants
+6. Ensure questions are appropriate and family-friendly
+
+RESPONSE FORMAT:
+Return ONLY a JSON array with this exact structure:
+
+[
+  {{
+    "question": "Will [specific question about a future event]?",
+    "category": "brief category name",
+    "description": "brief explanation of what makes this question interesting"
+  }}
+]
+
+EXAMPLE OUTPUT:
+[
+  {{
+    "question": "Will the temperature in New York City exceed 80°F on December 25th, 2024?",
+    "category": "Weather",
+    "description": "Unusual weather prediction for winter holiday"
+  }},
+  {{
+    "question": "Will Tesla's stock price be above $300 per share at market close on January 15th, 2024?",
+    "category": "Finance",
+    "description": "Stock market prediction for major tech company"
+  }}
+]
+
+Requirements:
+- All questions must start with "Will" and end with "?"
+- Questions must be about verifiable future events
+- Avoid questions that are too easy or too obvious
+- Make questions diverse and interesting
+- Return ONLY the JSON array, no additional text"""
+
+    user_prompt = f"""Based on this prompt, create {question_count} yes/no prediction questions:
+
+{prompt}
+
+Remember to create questions that are:
+- About future events that can be verified
+- Clear and unambiguous
+- Interesting and engaging
+- Appropriate for all audiences"""
+
+    try:
+        logger.info(f"Generating custom contest with prompt: {prompt[:100]}...")
+        
+        # Use the legacy OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        content = response.choices[0].message.content.strip()
+        
+        # Try to parse JSON from the response
+        try:
+            # Sometimes the response might have extra text, so try to find the JSON array
+            start_idx = content.find('[')
+            end_idx = content.rfind(']') + 1
+            
+            if start_idx == -1 or end_idx == 0:
+                raise ValueError("No JSON array found in response")
+            
+            json_content = content[start_idx:end_idx]
+            questions = json.loads(json_content)
+            
+            # Validate the structure
+            if not isinstance(questions, list):
+                raise ValueError("Response is not a list")
+            
+            for i, question in enumerate(questions):
+                if not isinstance(question, dict):
+                    raise ValueError(f"Question {i} is not a dictionary")
+                
+                required_fields = ['question', 'category', 'description']
+                for field in required_fields:
+                    if field not in question:
+                        raise ValueError(f"Question {i} missing required field: {field}")
+                
+                # Validate question format
+                if not question['question'].startswith('Will '):
+                    logger.warning(f"Question {i} doesn't start with 'Will ': {question['question']}")
+                
+                if not question['question'].endswith('?'):
+                    logger.warning(f"Question {i} doesn't end with '?': {question['question']}")
+            
+            logger.info(f"Successfully generated {len(questions)} custom contest questions")
+            return questions
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Failed to parse OpenAI response: {e}")
+            logger.error(f"Response content: {content}")
+            raise ContestGenerationError(f"Failed to parse AI response: {str(e)}")
+    
+    except openai.OpenAIError as e:
+        logger.error(f"OpenAI API error: {e}")
+        raise ContestGenerationError(f"AI service error: {str(e)}")
+    
+    except Exception as e:
+        logger.error(f"Unexpected error in custom contest generation: {e}")
+        raise ContestGenerationError(f"Unexpected error: {str(e)}")
+
+
 def generate_contest_name_and_description(sport: str, week_number: Optional[int] = None, 
                                         season_year: Optional[int] = None) -> Dict[str, str]:
     """Generate a contest name and description.

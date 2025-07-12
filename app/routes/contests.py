@@ -52,10 +52,14 @@ class InvitationForm(FlaskForm):
 class AutoGenerateForm(FlaskForm):
     """Form for auto-generating contests."""
     
+    generation_type = SelectField('Generation Type',
+                                 choices=[('nfl', 'NFL Sports Betting'), ('custom', 'Custom Prompt')],
+                                 default='nfl',
+                                 validators=[DataRequired()])
     sport = SelectField('Sport', 
                        choices=[('NFL', 'NFL')], 
                        default='NFL',
-                       validators=[DataRequired()])
+                       validators=[Optional()])
     question_count = IntegerField('Number of Questions', 
                                  validators=[DataRequired(), NumberRange(min=1, max=10)],
                                  default=5,
@@ -66,6 +70,9 @@ class AutoGenerateForm(FlaskForm):
     season_year = IntegerField('Season Year', 
                               validators=[Optional(), NumberRange(min=2020, max=2030)],
                               render_kw={'placeholder': 'Leave blank for current season'})
+    custom_prompt = TextAreaField('Custom Prompt',
+                                 validators=[Optional(), Length(max=1000)],
+                                 render_kw={'placeholder': 'Describe the type of contest you want to create. For example: "Create questions about technology predictions for 2024" or "Generate questions about weather events in major cities"', 'rows': '4'})
     timezone = SelectField('Timezone', choices=get_timezone_choices(), default='US/Central')
     accepted_questions = StringField('Accepted Questions', validators=[Optional()])
     submit = SubmitField('Generate Contest')
@@ -166,17 +173,18 @@ def create_contest():
         logger = logging.getLogger(__name__)
         logger.info(f"📝 Pre-populating {len(ai_generated_data['questions'])} questions:")
         
+        # Properly populate FieldList with AI-generated questions
         for i, question_data in enumerate(ai_generated_data['questions']):
-            question_form = QuestionForm()
             question_text = question_data['question']
-            question_form.question_text.data = question_text
-            form.questions.append_entry(question_form)
+            # Create the entry data dictionary that FieldList expects
+            entry_data = {'question_text': question_text}
+            form.questions.append_entry(entry_data)
             logger.info(f"   Question {i+1}: {question_text[:50]}...")
         
         # Ensure we have at least one question entry
         if len(form.questions.entries) == 0:
             logger.warning("No questions were added, adding empty question form")
-            form.questions.append_entry(QuestionForm())
+            form.questions.append_entry()
         
         logger.info(f"✅ Form now has {len(form.questions.entries)} question entries")
     
@@ -329,16 +337,32 @@ def delete_contest(contest_id):
         Redirect to contests list
     """
     contest = Contest.query.get_or_404(contest_id)
+    current_user = get_current_user()
     
     # Only allow deletion if no entries or if admin
-    if contest.has_entries() and not get_current_user().is_admin:
+    if contest.has_entries() and not current_user.is_admin:
         flash('Cannot delete contest with existing entries.', 'error')
         return redirect(url_for('contests.view_contest', contest_id=contest_id))
     
-    contest.is_active = False
-    db.session.commit()
+    try:
+        # For contests with entries, admins can choose to either soft delete or hard delete
+        if contest.has_entries() and current_user.is_admin:
+            # Soft delete - just mark as inactive to preserve data
+            contest.is_active = False
+            db.session.commit()
+            flash('Contest deactivated successfully. Data has been preserved.', 'success')
+        else:
+            # Hard delete - actually remove the contest and all related data
+            # The cascade='all, delete-orphan' relationships will handle cleanup
+            db.session.delete(contest)
+            db.session.commit()
+            flash('Contest deleted successfully.', 'success')
     
-    flash('Contest deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting contest: {str(e)}', 'error')
+        return redirect(url_for('contests.view_contest', contest_id=contest_id))
+    
     return redirect(url_for('contests.list_contests'))
 
 
@@ -782,7 +806,7 @@ def auto_generate():
     current_user = get_current_user()
     
     # Check if user can create AI contests
-    if not current_user.can_create_ai_contest():
+    if current_user and not current_user.can_create_ai_contest():
         remaining = current_user.get_remaining_ai_contests_today()
         flash(f'You have reached your daily limit of 3 AI-generated contests. You can create {remaining} more tomorrow.', 'error')
         return redirect(url_for('contests.list_contests'))
@@ -800,6 +824,9 @@ def auto_generate():
             season_year = form.season_year.data
             timezone_str = form.timezone.data
             
+            generation_type = form.generation_type.data
+            custom_prompt = form.custom_prompt.data
+            
             # Check if we have accepted questions from the preview modal
             accepted_questions_json = form.accepted_questions.data
             
@@ -807,10 +834,12 @@ def auto_generate():
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"✅ Auto-generate form submitted successfully!")
+            logger.info(f"   - Generation type: {generation_type}")
             logger.info(f"   - Sport: {sport}")
             logger.info(f"   - Question count: {question_count}")
             logger.info(f"   - Week: {week_number}")
             logger.info(f"   - Season: {season_year}")
+            logger.info(f"   - Custom prompt: {custom_prompt[:100] if custom_prompt else 'None'}...")
             logger.info(f"   - Timezone: {timezone_str}")
             logger.info(f"   - Has accepted_questions: {bool(accepted_questions_json)}")
             if accepted_questions_json:
@@ -838,26 +867,50 @@ def auto_generate():
             else:
                 # Generate new questions (fallback for direct form submission)
                 logger.info("Generating new questions (no accepted questions found)")
-                contest_info = generate_contest_name_and_description(
-                    sport=sport,
-                    week_number=week_number,
-                    season_year=season_year
-                )
                 
-                suggested_lock_time = get_suggested_lock_time(sport, week_number)
-                
-                # Generate questions based on sport
-                if sport.upper() == 'NFL':
-                    questions_data = generate_nfl_contest(week_number, season_year, question_count)
+                if generation_type == 'custom':
+                    # Validate custom prompt
+                    if not custom_prompt or not custom_prompt.strip():
+                        flash('Please provide a custom prompt for contest generation.', 'error')
+                        return render_template('contests/auto_generate.html', form=form)
+                    
+                    # Generate custom contest
+                    from app.utils.ai_generation import generate_custom_contest
+                    questions_data = generate_custom_contest(custom_prompt.strip(), question_count)
+                    
+                    # Create contest name and description based on prompt
+                    contest_name = f"Custom Contest - {datetime.now().strftime('%B %d, %Y')}"
+                    description = f"Custom prediction contest: {custom_prompt[:200]}{'...' if len(custom_prompt) > 200 else ''}"
+                    
+                    # Get suggested lock time (default to 3 days from now)
+                    suggested_lock_time = datetime.now() + timedelta(days=3)
+                    suggested_lock_time = suggested_lock_time.replace(hour=20, minute=0, second=0, microsecond=0)
+                    
                 else:
-                    flash('Only NFL contests are currently supported for auto-generation.', 'error')
-                    return render_template('contests/auto_generate.html', form=form)
+                    # NFL generation
+                    contest_info = generate_contest_name_and_description(
+                        sport=sport,
+                        week_number=week_number,
+                        season_year=season_year
+                    )
+                    
+                    suggested_lock_time = get_suggested_lock_time(sport, week_number)
+                    
+                    # Generate questions based on sport
+                    if sport.upper() == 'NFL':
+                        questions_data = generate_nfl_contest(week_number, season_year, question_count)
+                    else:
+                        flash('Only NFL contests are currently supported for auto-generation.', 'error')
+                        return render_template('contests/auto_generate.html', form=form)
+                    
+                    contest_name = contest_info['name']
+                    description = contest_info['description']
                 
                 # Store the generated data in session for the create form
                 from flask import session
                 session['ai_generated_data'] = {
-                    'contest_name': contest_info['name'],
-                    'description': contest_info['description'],
+                    'contest_name': contest_name,
+                    'description': description,
                     'suggested_lock_time': suggested_lock_time.isoformat(),
                     'questions': questions_data,
                     'timezone': timezone_str,
@@ -906,22 +959,10 @@ def preview_generation():
     """
     try:
         data = request.get_json()
-        sport = data.get('sport', 'NFL')
+        generation_type = data.get('generation_type', 'nfl')
         question_count = data.get('question_count', 5)
-        week_number = data.get('week_number')
-        season_year = data.get('season_year')
         
-        # Convert empty strings to None
-        if week_number == '':
-            week_number = None
-        if season_year == '':
-            season_year = None
-        
-        # Convert to integers if provided
-        if week_number is not None:
-            week_number = int(week_number)
-        if season_year is not None:
-            season_year = int(season_year)
+        # Convert to integer if provided
         if question_count is not None:
             question_count = int(question_count)
         
@@ -929,26 +970,67 @@ def preview_generation():
         if question_count < 1 or question_count > 10:
             return jsonify({'error': 'Question count must be between 1 and 10'}), 400
         
-        # Generate contest metadata
-        contest_info = generate_contest_name_and_description(
-            sport=sport,
-            week_number=week_number,
-            season_year=season_year
-        )
-        
-        # Generate questions based on sport
-        if sport.upper() == 'NFL':
-            questions_data = generate_nfl_contest(week_number, season_year, question_count)
+        if generation_type == 'custom':
+            # Handle custom prompt generation
+            custom_prompt = data.get('custom_prompt', '').strip()
+            
+            if not custom_prompt:
+                return jsonify({'error': 'Please provide a custom prompt'}), 400
+            
+            # Generate custom contest
+            from app.utils.ai_generation import generate_custom_contest
+            questions_data = generate_custom_contest(custom_prompt, question_count)
+            
+            # Create contest name and description based on prompt
+            contest_name = f"Custom Contest - {datetime.now().strftime('%B %d, %Y')}"
+            description = f"Custom prediction contest: {custom_prompt[:200]}{'...' if len(custom_prompt) > 200 else ''}"
+            
+            # Get suggested lock time (default to 3 days from now)
+            from datetime import timedelta
+            suggested_lock_time = datetime.now() + timedelta(days=3)
+            suggested_lock_time = suggested_lock_time.replace(hour=20, minute=0, second=0, microsecond=0)
+            
         else:
-            return jsonify({'error': 'Only NFL contests are currently supported'}), 400
-        
-        # Get suggested lock time
-        suggested_lock_time = get_suggested_lock_time(sport, week_number)
+            # Handle NFL generation
+            sport = data.get('sport', 'NFL')
+            week_number = data.get('week_number')
+            season_year = data.get('season_year')
+            
+            # Convert empty strings to None
+            if week_number == '':
+                week_number = None
+            if season_year == '':
+                season_year = None
+            
+            # Convert to integers if provided
+            if week_number is not None:
+                week_number = int(week_number)
+            if season_year is not None:
+                season_year = int(season_year)
+            
+            # Generate contest metadata
+            contest_info = generate_contest_name_and_description(
+                sport=sport,
+                week_number=week_number,
+                season_year=season_year
+            )
+            
+            # Generate questions based on sport
+            if sport.upper() == 'NFL':
+                questions_data = generate_nfl_contest(week_number, season_year, question_count)
+            else:
+                return jsonify({'error': 'Only NFL contests are currently supported'}), 400
+            
+            # Get suggested lock time
+            suggested_lock_time = get_suggested_lock_time(sport, week_number)
+            
+            contest_name = contest_info['name']
+            description = contest_info['description']
         
         return jsonify({
             'success': True,
-            'contest_name': contest_info['name'],
-            'description': contest_info['description'],
+            'contest_name': contest_name,
+            'description': description,
             'suggested_lock_time': suggested_lock_time.isoformat(),
             'questions': questions_data
         })

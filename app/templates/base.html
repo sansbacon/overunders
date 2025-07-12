@@ -38,9 +38,15 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('contests.list_contests') }}">Contests</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('leagues.list_leagues') }}">Leagues</a>
+                    </li>
                     {% if current_user %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('contests.my_contests') }}">My Contests</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('leagues.my_leagues') }}">My Leagues</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('contests.create_contest') }}">Create Contest</a>

@@ -151,13 +151,7 @@
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Question</label>
-                                            <input type="text" 
-                                                   class="form-control{% if question_form.question_text.errors %} is-invalid{% endif %}"
-                                                   name="{{ question_form.question_text.name }}"
-                                                   id="{{ question_form.question_text.id }}"
-                                                   value="{{ question_form.question_text.data or '' }}"
-                                                   maxlength="500"
-                                                   required>
+                                            {{ question_form.question_text(class="form-control" + (" is-invalid" if question_form.question_text.errors else ""), maxlength="500", required=True) }}
                                             {% if question_form.question_text.errors %}
                                             <div class="invalid-feedback">
                                                 {% for error in question_form.question_text.errors %}{{ error }}{% endfor %}

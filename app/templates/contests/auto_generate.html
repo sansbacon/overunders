@@ -38,9 +38,57 @@
                         {{ form.hidden_tag() }}
                         {{ form.accepted_questions(style="display: none;") }}
                         
-                        <!-- Sport Selection -->
+                        <!-- Generation Type Selection -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2">Generation Type</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.generation_type.label(class="form-label") }}
+                                {{ form.generation_type(class="form-select" + (" is-invalid" if form.generation_type.errors else ""), id="generation-type-select") }}
+                                {% if form.generation_type.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.generation_type.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">Choose between NFL sports betting questions or custom prompt-based questions</div>
+                            </div>
+                        </div>
+
+                        <!-- Contest Settings -->
                         <div class="mb-4">
                             <h5 class="border-bottom pb-2">Contest Settings</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.question_count.label(class="form-label") }}
+                                        {{ form.question_count(class="form-control" + (" is-invalid" if form.question_count.errors else "")) }}
+                                        {% if form.question_count.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.question_count.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Between 1 and 10 questions</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.timezone.label(class="form-label") }}
+                                        {{ form.timezone(class="form-select" + (" is-invalid" if form.timezone.errors else "")) }}
+                                        {% if form.timezone.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.timezone.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Contest lock time will be set in this timezone</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NFL-specific Settings -->
+                        <div class="mb-4" id="nfl-settings">
+                            <h5 class="border-bottom pb-2">NFL Settings</h5>
                             
                             <div class="row">
                                 <div class="col-md-4">
@@ -57,33 +105,6 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-3">
-                                        {{ form.question_count.label(class="form-label") }}
-                                        {{ form.question_count(class="form-control" + (" is-invalid" if form.question_count.errors else "")) }}
-                                        {% if form.question_count.errors %}
-                                        <div class="invalid-feedback">
-                                            {% for error in form.question_count.errors %}{{ error }}{% endfor %}
-                                        </div>
-                                        {% endif %}
-                                        <div class="form-text">Between 1 and 10 questions</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="mb-3">
-                                        {{ form.timezone.label(class="form-label") }}
-                                        {{ form.timezone(class="form-select" + (" is-invalid" if form.timezone.errors else "")) }}
-                                        {% if form.timezone.errors %}
-                                        <div class="invalid-feedback">
-                                            {% for error in form.timezone.errors %}{{ error }}{% endfor %}
-                                        </div>
-                                        {% endif %}
-                                        <div class="form-text">Contest lock time will be set in this timezone</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
                                         {{ form.week_number.label(class="form-label") }}
                                         {{ form.week_number(class="form-control" + (" is-invalid" if form.week_number.errors else "")) }}
                                         {% if form.week_number.errors %}
@@ -94,7 +115,7 @@
                                         <div class="form-text">NFL weeks 1-18 (leave blank for current week)</div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="mb-3">
                                         {{ form.season_year.label(class="form-label") }}
                                         {{ form.season_year(class="form-control" + (" is-invalid" if form.season_year.errors else "")) }}
@@ -106,6 +127,37 @@
                                         <div class="form-text">Leave blank for current season</div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom Prompt Settings -->
+                        <div class="mb-4" id="custom-settings" style="display: none;">
+                            <h5 class="border-bottom pb-2">Custom Prompt</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.custom_prompt.label(class="form-label") }}
+                                {{ form.custom_prompt(class="form-control" + (" is-invalid" if form.custom_prompt.errors else "")) }}
+                                {% if form.custom_prompt.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.custom_prompt.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    <strong>Examples:</strong><br>
+                                    • "Create questions about technology predictions for 2024"<br>
+                                    • "Generate questions about weather events in major cities"<br>
+                                    • "Make questions about stock market predictions"<br>
+                                    • "Create questions about entertainment industry events"
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Custom Contest Tips:</strong><br>
+                                • Be specific about the topic and timeframe<br>
+                                • Questions will be yes/no predictions about future events<br>
+                                • AI will create verifiable, objective questions<br>
+                                • Avoid subjective topics or matters of opinion
                             </div>
                         </div>
 
@@ -250,6 +302,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewBtn = document.getElementById('preview-btn');
     const generateBtn = document.getElementById('generate-btn');
     const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const generationTypeSelect = document.getElementById('generation-type-select');
+    const nflSettings = document.getElementById('nfl-settings');
+    const customSettings = document.getElementById('custom-settings');
     
     // Modal elements
     const modalLoading = document.getElementById('modal-loading');
@@ -266,16 +321,56 @@ document.addEventListener('DOMContentLoaded', function() {
     // Store the last generated data for reuse
     let lastGeneratedData = null;
     
+    // Handle generation type switching
+    function toggleGenerationSettings() {
+        const generationType = generationTypeSelect.value;
+        
+        if (generationType === 'custom') {
+            nflSettings.style.display = 'none';
+            customSettings.style.display = 'block';
+        } else {
+            nflSettings.style.display = 'block';
+            customSettings.style.display = 'none';
+        }
+    }
+    
+    // Initialize settings visibility
+    toggleGenerationSettings();
+    
+    // Listen for generation type changes
+    generationTypeSelect.addEventListener('change', toggleGenerationSettings);
+    
     function startPreview() {
-        const sport = document.querySelector('select[name="sport"]').value;
+        const generationType = document.querySelector('select[name="generation_type"]').value;
         const questionCount = document.querySelector('input[name="question_count"]').value;
-        const weekNumber = document.querySelector('input[name="week_number"]').value;
-        const seasonYear = document.querySelector('input[name="season_year"]').value;
         
         // Validate inputs
         if (!questionCount || questionCount < 1 || questionCount > 10) {
             alert('Please enter a valid question count between 1 and 10.');
             return;
+        }
+        
+        let requestData = {
+            generation_type: generationType,
+            question_count: questionCount
+        };
+        
+        if (generationType === 'custom') {
+            const customPrompt = document.querySelector('textarea[name="custom_prompt"]').value.trim();
+            if (!customPrompt) {
+                alert('Please provide a custom prompt for contest generation.');
+                return;
+            }
+            requestData.custom_prompt = customPrompt;
+        } else {
+            // NFL generation
+            const sport = document.querySelector('select[name="sport"]').value;
+            const weekNumber = document.querySelector('input[name="week_number"]').value;
+            const seasonYear = document.querySelector('input[name="season_year"]').value;
+            
+            requestData.sport = sport;
+            requestData.week_number = weekNumber;
+            requestData.season_year = seasonYear;
         }
         
         // Show modal in loading state
@@ -289,12 +384,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
             },
-            body: JSON.stringify({
-                sport: sport,
-                question_count: questionCount,
-                week_number: weekNumber,
-                season_year: seasonYear
-            })
+            body: JSON.stringify(requestData)
         })
         .then(response => {
             if (!response.ok) {
@@ -368,6 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayPreviewInModal(data) {
         const lockDate = new Date(data.suggested_lock_time);
         const timezone = document.querySelector('select[name="timezone"]').value;
+        const generationType = document.querySelector('select[name="generation_type"]').value;
         
         let html = `
             <div class="mb-4">
@@ -391,25 +482,45 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         data.questions.forEach((question, index) => {
-            const badgeClass = question.line_type === 'spread' ? 'bg-primary' : 'bg-success';
-            const badgeText = question.line_type === 'spread' ? 'Spread' : 'Over/Under';
-            
-            html += `
-                <div class="list-group-item">
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                            <h6 class="mb-2">Question ${index + 1}</h6>
-                            <p class="mb-2 fw-medium">${escapeHtml(question.question)}</p>
-                            <small class="text-muted">
-                                <strong>Game:</strong> ${escapeHtml(question.game)} | 
-                                <strong>Line:</strong> ${question.line_value}
-                                ${question.team_favored ? ' | <strong>Favored:</strong> ' + escapeHtml(question.team_favored) : ''}
-                            </small>
+            if (generationType === 'custom') {
+                // Custom prompt questions have different structure
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">Question ${index + 1}</h6>
+                                <p class="mb-2 fw-medium">${escapeHtml(question.question)}</p>
+                                <small class="text-muted">
+                                    <strong>Category:</strong> ${escapeHtml(question.category)} | 
+                                    <strong>Description:</strong> ${escapeHtml(question.description)}
+                                </small>
+                            </div>
+                            <span class="badge bg-info ms-2">Custom</span>
                         </div>
-                        <span class="badge ${badgeClass} ms-2">${badgeText}</span>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                // NFL questions have line_type structure
+                const badgeClass = question.line_type === 'spread' ? 'bg-primary' : 'bg-success';
+                const badgeText = question.line_type === 'spread' ? 'Spread' : 'Over/Under';
+                
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">Question ${index + 1}</h6>
+                                <p class="mb-2 fw-medium">${escapeHtml(question.question)}</p>
+                                <small class="text-muted">
+                                    <strong>Game:</strong> ${escapeHtml(question.game)} | 
+                                    <strong>Line:</strong> ${question.line_value}
+                                    ${question.team_favored ? ' | <strong>Favored:</strong> ' + escapeHtml(question.team_favored) : ''}
+                                </small>
+                            </div>
+                            <span class="badge ${badgeClass} ms-2">${badgeText}</span>
+                        </div>
+                    </div>
+                `;
+            }
         });
         
         html += `
@@ -498,15 +609,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 newForm.appendChild(csrfInput);
                 
                 // Add all form fields
+                const generationType = document.querySelector('select[name="generation_type"]').value;
                 const formFields = [
-                    { name: 'sport', value: sport },
+                    { name: 'generation_type', value: generationType },
                     { name: 'question_count', value: questionCount },
                     { name: 'timezone', value: timezone },
-                    { name: 'week_number', value: document.querySelector('input[name="week_number"]').value || '' },
-                    { name: 'season_year', value: document.querySelector('input[name="season_year"]').value || '' },
                     { name: 'accepted_questions', value: JSON.stringify(lastGeneratedData) },
                     { name: 'submit', value: 'Generate Contest' }
                 ];
+                
+                // Add generation-type specific fields
+                if (generationType === 'custom') {
+                    const customPrompt = document.querySelector('textarea[name="custom_prompt"]').value || '';
+                    formFields.push({ name: 'custom_prompt', value: customPrompt });
+                } else {
+                    // NFL fields
+                    formFields.push(
+                        { name: 'sport', value: sport },
+                        { name: 'week_number', value: document.querySelector('input[name="week_number"]').value || '' },
+                        { name: 'season_year', value: document.querySelector('input[name="season_year"]').value || '' }
+                    );
+                }
                 
                 console.log('Adding form fields:', formFields.length);
                 

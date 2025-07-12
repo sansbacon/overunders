@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}My Leagues{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>My Leagues</h1>
+                <div>
+                    <a href="{{ url_for('leagues.list_leagues') }}" class="btn btn-outline-primary me-2">Browse Leagues</a>
+                    <a href="{{ url_for('leagues.create_league') }}" class="btn btn-primary">Create League</a>
+                </div>
+            </div>
+
+            {% if user_leagues %}
+            <div class="row">
+                {% for league_data in user_leagues %}
+                {% set league = league_data.league %}
+                {% set membership = league_data.membership %}
+                {% set is_admin = league_data.is_admin %}
+                
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="text-decoration-none">
+                                    {{ league.league_name }}
+                                </a>
+                            </h5>
+                            
+                            {% if league.description %}
+                            <p class="card-text text-muted">{{ league.description[:100] }}{% if league.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <small class="text-muted">Members</small>
+                                    <div class="fw-bold">{{ league.get_member_count() }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Contests</small>
+                                    <div class="fw-bold">{{ league.get_contest_count() }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Win Bonus</small>
+                                    <div class="fw-bold">{{ league.win_bonus_points }}pts</div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    {% if league.is_public %}
+                                    <span class="badge bg-success">Public</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Private</span>
+                                    {% endif %}
+                                    
+                                    {% if league.created_by_user == current_user.user_id %}
+                                    <span class="badge bg-primary">Creator</span>
+                                    {% elif is_admin %}
+                                    <span class="badge bg-info">Admin</span>
+                                    {% else %}
+                                    <span class="badge bg-light text-dark">Member</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <!-- League Performance Summary -->
+                            {% set leaderboard = league.get_leaderboard() %}
+                            {% if leaderboard %}
+                                {% for entry in leaderboard %}
+                                    {% if entry.user.user_id == current_user.user_id %}
+                                    <div class="alert alert-light py-2">
+                                        <small>
+                                            <strong>Your Performance:</strong><br>
+                                            Rank: #{{ loop.index }} | 
+                                            Points: {{ entry.total_points }} | 
+                                            Wins: {{ entry.contest_wins }}
+                                        </small>
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            
+                            <div class="d-flex gap-2">
+                                <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="btn btn-sm btn-outline-primary flex-fill">View</a>
+                                {% if is_admin %}
+                                <a href="{{ url_for('leagues.manage_league', league_id=league.league_id) }}" class="btn btn-sm btn-primary">Manage</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-footer text-muted">
+                            <small>
+                                Joined {{ membership.joined_at|strftime('%b %d, %Y') }}
+                                {% if league.created_by_user == current_user.user_id %}
+                                | Created by you
+                                {% else %}
+                                | Created by {{ league.creator.username }}
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- League Statistics -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">League Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <h4 class="text-primary">{{ user_leagues|length }}</h4>
+                            <small class="text-muted">Total Leagues</small>
+                        </div>
+                        <div class="col-md-3">
+                            <h4 class="text-success">{{ user_leagues|selectattr('is_admin')|list|length }}</h4>
+                            <small class="text-muted">Admin Roles</small>
+                        </div>
+                        <div class="col-md-3">
+                            {% set created_count = user_leagues|selectattr('league.created_by_user', 'equalto', current_user.user_id)|list|length %}
+                            <h4 class="text-warning">{{ created_count }}</h4>
+                            <small class="text-muted">Created by You</small>
+                        </div>
+                        <div class="col-md-3">
+                            {% set total_contests = user_leagues|sum(attribute='league.get_contest_count') %}
+                            <h4 class="text-info">{{ total_contests }}</h4>
+                            <small class="text-muted">Total Contests</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <div class="text-center py-5">
+                <h3 class="text-muted">You're not in any leagues yet</h3>
+                <p class="text-muted">Join existing leagues or create your own to start competing!</p>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="{{ url_for('leagues.list_leagues') }}" class="btn btn-outline-primary">Browse Leagues</a>
+                    <a href="{{ url_for('leagues.create_league') }}" class="btn btn-primary">Create League</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

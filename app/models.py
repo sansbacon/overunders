@@ -172,6 +172,7 @@ class Contest(db.Model):
     # Relationships
     questions = db.relationship('Question', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
     entries = db.relationship('ContestEntry', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
+    invitations = db.relationship('ContestInvitation', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
     
     def __repr__(self) -> str:
         """String representation of Contest."""
@@ -413,7 +414,6 @@ class ContestInvitation(db.Model):
     sent_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
-    contest = db.relationship('Contest', backref='invitations')
     sent_by = db.relationship('User', backref='sent_invitations')
 
 
@@ -541,6 +541,227 @@ class NFLSchedule(db.Model):
             str: Formatted matchup
         """
         return self.get_matchup_string(self.home_team, self.away_team)
+
+
+class League(db.Model):
+    """League model for storing league information."""
+    
+    __tablename__ = 'leagues'
+    
+    league_id = db.Column(db.Integer, primary_key=True)
+    league_name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_by_user = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_public = db.Column(db.Boolean, default=False, nullable=False)
+    win_bonus_points = db.Column(db.Integer, default=5, nullable=False)
+    
+    # Relationships
+    creator = db.relationship('User', backref='created_leagues', foreign_keys=[created_by_user])
+    memberships = db.relationship('LeagueMembership', backref='league', lazy='dynamic', cascade='all, delete-orphan')
+    league_contests = db.relationship('LeagueContest', backref='league', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __repr__(self) -> str:
+        """String representation of League."""
+        return f'<League {self.league_name}>'
+    
+    def get_members(self) -> List['User']:
+        """Get all members of this league.
+        
+        Returns:
+            List[User]: List of users who are members of this league
+        """
+        return [membership.user for membership in self.memberships.all()]
+    
+    def get_member_count(self) -> int:
+        """Get count of league members.
+        
+        Returns:
+            int: Number of members in the league
+        """
+        return self.memberships.count()
+    
+    def is_member(self, user: 'User') -> bool:
+        """Check if user is a member of this league.
+        
+        Args:
+            user (User): User to check
+            
+        Returns:
+            bool: True if user is a member, False otherwise
+        """
+        return self.memberships.filter_by(user_id=user.user_id).first() is not None
+    
+    def is_admin(self, user: 'User') -> bool:
+        """Check if user is an admin of this league.
+        
+        Args:
+            user (User): User to check
+            
+        Returns:
+            bool: True if user is an admin, False otherwise
+        """
+        membership = self.memberships.filter_by(user_id=user.user_id).first()
+        return membership and membership.is_admin
+    
+    def get_contests(self) -> List['Contest']:
+        """Get all contests in this league ordered by contest_order.
+        
+        Returns:
+            List[Contest]: List of contests in the league
+        """
+        league_contests = self.league_contests.order_by(LeagueContest.contest_order).all()
+        return [lc.contest for lc in league_contests]
+    
+    def get_contest_count(self) -> int:
+        """Get count of contests in this league.
+        
+        Returns:
+            int: Number of contests in the league
+        """
+        return self.league_contests.count()
+    
+    def get_leaderboard(self) -> List[dict]:
+        """Get overall league leaderboard combining all contest results.
+        
+        Returns:
+            List[dict]: Leaderboard data with user info, total points, and contest wins
+        """
+        leaderboard = {}
+        contests = self.get_contests()
+        
+        # Initialize leaderboard for all members
+        for member in self.get_members():
+            leaderboard[member.user_id] = {
+                'user': member,
+                'total_points': 0,
+                'contest_wins': 0,
+                'contests_participated': 0,
+                'contests_completed': 0,
+                'contest_details': []
+            }
+        
+        # Process each contest
+        for contest in contests:
+            if contest.is_locked() and contest.has_all_answers():
+                contest_leaderboard = contest.get_leaderboard()
+                
+                # Track who participated in this contest
+                participants = {entry['user'].user_id for entry in contest_leaderboard}
+                
+                for i, entry in enumerate(contest_leaderboard, 1):
+                    user_id = entry['user'].user_id
+                    if user_id in leaderboard:
+                        # Add points from this contest
+                        points = entry['correct_answers']
+                        
+                        # Add win bonus if they won this contest
+                        if i == 1:
+                            points += self.win_bonus_points
+                            leaderboard[user_id]['contest_wins'] += 1
+                        
+                        leaderboard[user_id]['total_points'] += points
+                        leaderboard[user_id]['contests_completed'] += 1
+                        leaderboard[user_id]['contest_details'].append({
+                            'contest': contest,
+                            'position': i,
+                            'score': entry['correct_answers'],
+                            'bonus_points': self.win_bonus_points if i == 1 else 0,
+                            'total_points': points
+                        })
+                
+                # Update participation count for all league members who participated
+                for user_id in participants:
+                    if user_id in leaderboard:
+                        leaderboard[user_id]['contests_participated'] += 1
+        
+        # Convert to list and sort by total points (desc), then by contest wins (desc)
+        leaderboard_list = list(leaderboard.values())
+        leaderboard_list.sort(key=lambda x: (x['total_points'], x['contest_wins']), reverse=True)
+        
+        return leaderboard_list
+    
+    def add_contest(self, contest: 'Contest') -> 'LeagueContest':
+        """Add a contest to this league.
+        
+        Args:
+            contest (Contest): Contest to add
+            
+        Returns:
+            LeagueContest: The created league contest relationship
+        """
+        # Get the next order number
+        max_order = db.session.query(db.func.max(LeagueContest.contest_order))\
+                             .filter_by(league_id=self.league_id).scalar() or 0
+        
+        league_contest = LeagueContest(
+            league_id=self.league_id,
+            contest_id=contest.contest_id,
+            contest_order=max_order + 1
+        )
+        db.session.add(league_contest)
+        return league_contest
+    
+    def remove_contest(self, contest: 'Contest') -> bool:
+        """Remove a contest from this league.
+        
+        Args:
+            contest (Contest): Contest to remove
+            
+        Returns:
+            bool: True if contest was removed, False if not found
+        """
+        league_contest = self.league_contests.filter_by(contest_id=contest.contest_id).first()
+        if league_contest:
+            db.session.delete(league_contest)
+            return True
+        return False
+
+
+class LeagueMembership(db.Model):
+    """League membership model for tracking users in leagues."""
+    
+    __tablename__ = 'league_memberships'
+    
+    membership_id = db.Column(db.Integer, primary_key=True)
+    league_id = db.Column(db.Integer, db.ForeignKey('leagues.league_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='league_memberships')
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('league_id', 'user_id', name='unique_league_user_membership'),)
+    
+    def __repr__(self) -> str:
+        """String representation of LeagueMembership."""
+        return f'<LeagueMembership {self.membership_id}: User {self.user_id} in League {self.league_id}>'
+
+
+class LeagueContest(db.Model):
+    """League contest model for linking contests to leagues."""
+    
+    __tablename__ = 'league_contests'
+    
+    league_contest_id = db.Column(db.Integer, primary_key=True)
+    league_id = db.Column(db.Integer, db.ForeignKey('leagues.league_id'), nullable=False)
+    contest_id = db.Column(db.Integer, db.ForeignKey('contests.contest_id'), nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    contest_order = db.Column(db.Integer, default=1, nullable=False)
+    
+    # Relationships
+    contest = db.relationship('Contest', backref='league_contests')
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('league_id', 'contest_id', name='unique_league_contest'),)
+    
+    def __repr__(self) -> str:
+        """String representation of LeagueContest."""
+        return f'<LeagueContest {self.league_contest_id}: Contest {self.contest_id} in League {self.league_id}>'
 
 
 class LoginToken(db.Model):
