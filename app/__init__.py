@@ -62,6 +62,9 @@ def create_app(config_name=None):
     from app.routes.admin import admin as admin_blueprint
     app.register_blueprint(admin_blueprint, url_prefix='/admin')
     
+    from app.routes.leagues import leagues as leagues_blueprint
+    app.register_blueprint(leagues_blueprint, url_prefix='/leagues')
+    
     from app.routes.health import health as health_blueprint
     app.register_blueprint(health_blueprint)
     

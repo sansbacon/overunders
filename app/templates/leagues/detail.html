@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}{{ league.league_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <!-- League Header -->
+            <div class="d-flex justify-content-between align-items-start mb-4">
+                <div>
+                    <h1>{{ league.league_name }}</h1>
+                    {% if league.description %}
+                    <p class="text-muted">{{ league.description }}</p>
+                    {% endif %}
+                    <div class="d-flex gap-2 mb-2">
+                        {% if league.is_public %}
+                        <span class="badge bg-success">Public</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Private</span>
+                        {% endif %}
+                        <span class="badge bg-info">{{ league.get_member_count() }} Members</span>
+                        <span class="badge bg-warning">{{ league.get_contest_count() }} Contests</span>
+                        <span class="badge bg-primary">{{ league.win_bonus_points }} Win Bonus</span>
+                    </div>
+                    <small class="text-muted">Created by {{ league.creator.username }} on {{ league.created_at|strftime('%B %d, %Y') }}</small>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    {% if current_user %}
+                        {% if is_member %}
+                            {% if is_admin %}
+                            <a href="{{ url_for('leagues.manage_league', league_id=league.league_id) }}" class="btn btn-primary">Manage League</a>
+                            <a href="{{ url_for('leagues.edit_league', league_id=league.league_id) }}" class="btn btn-outline-primary">Edit</a>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('leagues.leave_league', league_id=league.league_id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Are you sure you want to leave this league?')">Leave League</button>
+                            </form>
+                        {% elif league.is_public %}
+                            <form method="POST" action="{{ url_for('leagues.join_league', league_id=league.league_id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-success">Join League</button>
+                            </form>
+                        {% endif %}
+                    {% endif %}
+                    <a href="{{ url_for('leagues.league_leaderboard', league_id=league.league_id) }}" class="btn btn-outline-info">View Full Leaderboard</a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- League Leaderboard -->
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">League Leaderboard</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if leaderboard %}
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Player</th>
+                                            <th>Total Points</th>
+                                            <th>Contest Wins</th>
+                                            <th>Contests Played</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in leaderboard[:10] %}
+                                        <tr>
+                                            <td>
+                                                {% if loop.index == 1 %}
+                                                <span class="badge bg-warning">🥇 {{ loop.index }}</span>
+                                                {% elif loop.index == 2 %}
+                                                <span class="badge bg-secondary">🥈 {{ loop.index }}</span>
+                                                {% elif loop.index == 3 %}
+                                                <span class="badge bg-warning">🥉 {{ loop.index }}</span>
+                                                {% else %}
+                                                {{ loop.index }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ entry.user.get_display_name() }}</td>
+                                            <td><strong>{{ entry.total_points }}</strong></td>
+                                            <td>{{ entry.contest_wins }}</td>
+                                            <td>{{ entry.contests_participated }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% if leaderboard|length > 10 %}
+                            <div class="text-center">
+                                <a href="{{ url_for('leagues.league_leaderboard', league_id=league.league_id) }}" class="btn btn-outline-primary">View Full Leaderboard</a>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <div class="text-center py-4">
+                                <p class="text-muted">No completed contests yet. Add some contests to start tracking scores!</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- League Contests -->
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">League Contests</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if contests %}
+                            <div class="list-group list-group-flush">
+                                {% for contest in contests %}
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-1">
+                                                <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="text-decoration-none">
+                                                    {{ contest.contest_name }}
+                                                </a>
+                                            </h6>
+                                            <small class="text-muted">
+                                                {% if contest.is_locked() %}
+                                                    {% if contest.has_all_answers() %}
+                                                    <span class="badge bg-success">Completed</span>
+                                                    {% else %}
+                                                    <span class="badge bg-warning">Locked</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                <span class="badge bg-primary">Open</span>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        Lock: {{ contest.lock_timestamp|to_central_time|strftime('%b %d, %Y %I:%M %p') }}
+                                    </small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-4">
+                                <p class="text-muted">No contests in this league yet.</p>
+                                {% if is_admin %}
+                                <a href="{{ url_for('leagues.manage_league', league_id=league.league_id) }}" class="btn btn-sm btn-primary">Add Contests</a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- League Members -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">Recent Members</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set members = league.get_members() %}
+                            {% if members %}
+                            <div class="list-group list-group-flush">
+                                {% for member in members[:5] %}
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <span>{{ member.get_display_name() }}</span>
+                                    {% if league.created_by_user == member.user_id %}
+                                    <span class="badge bg-primary">Creator</span>
+                                    {% elif league.is_admin(member) %}
+                                    <span class="badge bg-info">Admin</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% if members|length > 5 %}
+                            <div class="text-center mt-2">
+                                <small class="text-muted">and {{ members|length - 5 }} more members</small>
+                            </div>
+                            {% endif %}
+                            {% else %}
+                            <p class="text-muted text-center">No members yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

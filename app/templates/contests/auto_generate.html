@@ -1,0 +1,692 @@
+{% extends "base.html" %}
+
+{% block title %}Auto-Generate Contest - Over-Under Contests{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">
+                            <i class="bi bi-magic"></i> Auto-Generate Contest
+                        </h4>
+                        <a href="{{ url_for('contests.list_contests') }}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Back to Contests
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>AI-Powered Contest Generation</strong><br>
+                        Use artificial intelligence to automatically generate contest questions based on realistic NFL matchups and betting lines. 
+                        The AI creates questions using actual NFL teams and typical betting scenarios for the specified week and season.
+                        {% if current_user and not current_user.is_admin %}
+                        <br><br>
+                        <strong>Daily Limit:</strong> You can create {{ current_user.get_remaining_ai_contests_today() }} more AI-generated contests today.
+                        {% endif %}
+                        <br><br>
+                        <small class="text-muted">
+                            <strong>Note:</strong> Generated questions use realistic team matchups and betting lines based on typical NFL scenarios. 
+                            While teams and lines are realistic, they may not reflect actual current games or betting data.
+                        </small>
+                    </div>
+
+                    <form method="POST" id="auto-generate-form">
+                        {{ form.hidden_tag() }}
+                        {{ form.accepted_questions(style="display: none;") }}
+                        
+                        <!-- Generation Type Selection -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2">Generation Type</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.generation_type.label(class="form-label") }}
+                                {{ form.generation_type(class="form-select" + (" is-invalid" if form.generation_type.errors else ""), id="generation-type-select") }}
+                                {% if form.generation_type.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.generation_type.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">Choose between NFL sports betting questions or custom prompt-based questions</div>
+                            </div>
+                        </div>
+
+                        <!-- Contest Settings -->
+                        <div class="mb-4">
+                            <h5 class="border-bottom pb-2">Contest Settings</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.question_count.label(class="form-label") }}
+                                        {{ form.question_count(class="form-control" + (" is-invalid" if form.question_count.errors else "")) }}
+                                        {% if form.question_count.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.question_count.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Between 1 and 10 questions</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        {{ form.timezone.label(class="form-label") }}
+                                        {{ form.timezone(class="form-select" + (" is-invalid" if form.timezone.errors else "")) }}
+                                        {% if form.timezone.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.timezone.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Contest lock time will be set in this timezone</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- NFL-specific Settings -->
+                        <div class="mb-4" id="nfl-settings">
+                            <h5 class="border-bottom pb-2">NFL Settings</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.sport.label(class="form-label") }}
+                                        {{ form.sport(class="form-select" + (" is-invalid" if form.sport.errors else "")) }}
+                                        {% if form.sport.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.sport.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">More sports will be added in future updates</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.week_number.label(class="form-label") }}
+                                        {{ form.week_number(class="form-control" + (" is-invalid" if form.week_number.errors else "")) }}
+                                        {% if form.week_number.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.week_number.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">NFL weeks 1-18 (leave blank for current week)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        {{ form.season_year.label(class="form-label") }}
+                                        {{ form.season_year(class="form-control" + (" is-invalid" if form.season_year.errors else "")) }}
+                                        {% if form.season_year.errors %}
+                                        <div class="invalid-feedback">
+                                            {% for error in form.season_year.errors %}{{ error }}{% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        <div class="form-text">Leave blank for current season</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom Prompt Settings -->
+                        <div class="mb-4" id="custom-settings" style="display: none;">
+                            <h5 class="border-bottom pb-2">Custom Prompt</h5>
+                            
+                            <div class="mb-3">
+                                {{ form.custom_prompt.label(class="form-label") }}
+                                {{ form.custom_prompt(class="form-control" + (" is-invalid" if form.custom_prompt.errors else "")) }}
+                                {% if form.custom_prompt.errors %}
+                                <div class="invalid-feedback">
+                                    {% for error in form.custom_prompt.errors %}{{ error }}{% endfor %}
+                                </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    <strong>Examples:</strong><br>
+                                    • "Create questions about technology predictions for 2024"<br>
+                                    • "Generate questions about weather events in major cities"<br>
+                                    • "Make questions about stock market predictions"<br>
+                                    • "Create questions about entertainment industry events"
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Custom Contest Tips:</strong><br>
+                                • Be specific about the topic and timeframe<br>
+                                • Questions will be yes/no predictions about future events<br>
+                                • AI will create verifiable, objective questions<br>
+                                • Avoid subjective topics or matters of opinion
+                            </div>
+                        </div>
+
+                        <!-- Preview Section -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                                <h5 class="mb-0">Preview Generated Contest</h5>
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="preview-btn">
+                                    <i class="bi bi-eye"></i> Preview Questions
+                                </button>
+                            </div>
+                            
+                            <div class="alert alert-light">
+                                <i class="bi bi-lightbulb"></i>
+                                <strong>Preview First:</strong> Click "Preview Questions" to see the AI-generated questions before creating your contest. 
+                                You'll be able to review and approve the questions in a preview window.
+                            </div>
+                        </div>
+
+                        <!-- Progress indicator for form submission -->
+                        <div id="form-progress" class="alert alert-warning" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm text-warning me-3" role="status">
+                                    <span class="visually-hidden">Creating...</span>
+                                </div>
+                                <div>
+                                    <strong>Creating your contest...</strong><br>
+                                    <small>Please wait while we generate your questions and create the contest. This may take 30-60 seconds.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('contests.list_contests') }}" class="btn btn-secondary" id="cancel-btn">Cancel</a>
+                            {{ form.submit(class="btn btn-primary", id="generate-btn") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- How it Works -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-question-circle"></i> How Auto-Generation Works
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-1-circle text-primary"></i> AI Analysis</h6>
+                            <p class="small">Our AI analyzes typical NFL betting lines and creates realistic questions about point spreads and over/under totals for the selected week.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-2-circle text-primary"></i> Smart Timing</h6>
+                            <p class="small">The contest is automatically scheduled to lock before games begin, typically Thursday evening for NFL contests.</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-3-circle text-primary"></i> Quality Questions</h6>
+                            <p class="small">Generated questions are clear, unambiguous, and based on realistic betting scenarios that make for engaging predictions.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-4-circle text-primary"></i> Ready to Play</h6>
+                            <p class="small">Your contest is immediately ready for participants to join and make their predictions!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalLabel">
+                    <i class="bi bi-eye"></i> Preview Generated Questions
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Loading state -->
+                <div id="modal-loading" class="text-center py-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h6>Generating Questions...</h6>
+                    <p class="text-muted">This may take 10-30 seconds while our AI creates your questions.</p>
+                </div>
+                
+                <!-- Error state -->
+                <div id="modal-error" class="alert alert-danger" style="display: none;">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
+                        <div class="flex-grow-1">
+                            <strong>Generation Failed</strong><br>
+                            <span id="modal-error-message"></span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Preview content -->
+                <div id="modal-preview-content" style="display: none;">
+                    <!-- Content will be populated by JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div id="modal-loading-footer" class="w-100 text-center">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                </div>
+                
+                <div id="modal-error-footer" class="w-100" style="display: none;">
+                    <button type="button" class="btn btn-outline-danger" id="modal-retry-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Try Again
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+                
+                <div id="modal-success-footer" class="w-100" style="display: none;">
+                    <button type="button" class="btn btn-outline-secondary" id="modal-regenerate-btn">
+                        <i class="bi bi-arrow-clockwise"></i> Generate Different Questions
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="modal-accept-btn">
+                        <i class="bi bi-check-lg"></i> Use These Questions
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const previewBtn = document.getElementById('preview-btn');
+    const generateBtn = document.getElementById('generate-btn');
+    const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const generationTypeSelect = document.getElementById('generation-type-select');
+    const nflSettings = document.getElementById('nfl-settings');
+    const customSettings = document.getElementById('custom-settings');
+    
+    // Modal elements
+    const modalLoading = document.getElementById('modal-loading');
+    const modalError = document.getElementById('modal-error');
+    const modalErrorMessage = document.getElementById('modal-error-message');
+    const modalPreviewContent = document.getElementById('modal-preview-content');
+    const modalLoadingFooter = document.getElementById('modal-loading-footer');
+    const modalErrorFooter = document.getElementById('modal-error-footer');
+    const modalSuccessFooter = document.getElementById('modal-success-footer');
+    const modalRetryBtn = document.getElementById('modal-retry-btn');
+    const modalRegenerateBtn = document.getElementById('modal-regenerate-btn');
+    const modalAcceptBtn = document.getElementById('modal-accept-btn');
+    
+    // Store the last generated data for reuse
+    let lastGeneratedData = null;
+    
+    // Handle generation type switching
+    function toggleGenerationSettings() {
+        const generationType = generationTypeSelect.value;
+        
+        if (generationType === 'custom') {
+            nflSettings.style.display = 'none';
+            customSettings.style.display = 'block';
+        } else {
+            nflSettings.style.display = 'block';
+            customSettings.style.display = 'none';
+        }
+    }
+    
+    // Initialize settings visibility
+    toggleGenerationSettings();
+    
+    // Listen for generation type changes
+    generationTypeSelect.addEventListener('change', toggleGenerationSettings);
+    
+    function startPreview() {
+        const generationType = document.querySelector('select[name="generation_type"]').value;
+        const questionCount = document.querySelector('input[name="question_count"]').value;
+        
+        // Validate inputs
+        if (!questionCount || questionCount < 1 || questionCount > 10) {
+            alert('Please enter a valid question count between 1 and 10.');
+            return;
+        }
+        
+        let requestData = {
+            generation_type: generationType,
+            question_count: questionCount
+        };
+        
+        if (generationType === 'custom') {
+            const customPrompt = document.querySelector('textarea[name="custom_prompt"]').value.trim();
+            if (!customPrompt) {
+                alert('Please provide a custom prompt for contest generation.');
+                return;
+            }
+            requestData.custom_prompt = customPrompt;
+        } else {
+            // NFL generation
+            const sport = document.querySelector('select[name="sport"]').value;
+            const weekNumber = document.querySelector('input[name="week_number"]').value;
+            const seasonYear = document.querySelector('input[name="season_year"]').value;
+            
+            requestData.sport = sport;
+            requestData.week_number = weekNumber;
+            requestData.season_year = seasonYear;
+        }
+        
+        // Show modal in loading state
+        showModalLoading();
+        previewModal.show();
+        
+        // Make API call to preview endpoint
+        fetch('{{ url_for("contests.preview_generation") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('input[name="csrf_token"]').value
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                // Try to parse error response
+                return response.json().then(errorData => {
+                    throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+                }).catch(parseError => {
+                    // If JSON parsing fails, use status text
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                lastGeneratedData = data;
+                showModalSuccess(data);
+            } else {
+                showModalError(data.error || 'Failed to generate preview');
+            }
+        })
+        .catch(error => {
+            let errorMessage = 'Network error occurred while generating preview.';
+            if (error.message.includes('HTTP 400')) {
+                errorMessage = 'Invalid request parameters. Please check your inputs and try again.';
+            } else if (error.message.includes('HTTP 500')) {
+                errorMessage = 'Server error occurred. This might be due to AI service issues. Please try again in a moment.';
+            } else if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+            } else if (error.message.includes('Unexpected error')) {
+                errorMessage = 'AI service error: ' + error.message;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            console.error('Preview generation error:', error);
+            showModalError(errorMessage);
+        });
+    }
+    
+    function showModalLoading() {
+        modalLoading.style.display = 'block';
+        modalError.style.display = 'none';
+        modalPreviewContent.style.display = 'none';
+        modalLoadingFooter.style.display = 'block';
+        modalErrorFooter.style.display = 'none';
+        modalSuccessFooter.style.display = 'none';
+    }
+    
+    function showModalError(message) {
+        modalLoading.style.display = 'none';
+        modalError.style.display = 'block';
+        modalPreviewContent.style.display = 'none';
+        modalLoadingFooter.style.display = 'none';
+        modalErrorFooter.style.display = 'block';
+        modalSuccessFooter.style.display = 'none';
+        modalErrorMessage.textContent = message;
+    }
+    
+    function showModalSuccess(data) {
+        modalLoading.style.display = 'none';
+        modalError.style.display = 'none';
+        modalPreviewContent.style.display = 'block';
+        modalLoadingFooter.style.display = 'none';
+        modalErrorFooter.style.display = 'none';
+        modalSuccessFooter.style.display = 'block';
+        
+        displayPreviewInModal(data);
+    }
+    
+    function displayPreviewInModal(data) {
+        const lockDate = new Date(data.suggested_lock_time);
+        const timezone = document.querySelector('select[name="timezone"]').value;
+        const generationType = document.querySelector('select[name="generation_type"]').value;
+        
+        let html = `
+            <div class="mb-4">
+                <h6 class="text-primary mb-3">
+                    <i class="bi bi-info-circle"></i> Contest Details
+                </h6>
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <p class="mb-2"><strong>Name:</strong> ${escapeHtml(data.contest_name)}</p>
+                        <p class="mb-2"><strong>Description:</strong> ${escapeHtml(data.description)}</p>
+                        <p class="mb-0"><strong>Lock Time:</strong> ${lockDate.toLocaleString()} (${timezone})</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <h6 class="text-primary mb-3">
+                    <i class="bi bi-question-circle"></i> Generated Questions (${data.questions.length})
+                </h6>
+                <div class="list-group">
+        `;
+        
+        data.questions.forEach((question, index) => {
+            if (generationType === 'custom') {
+                // Custom prompt questions have different structure
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">Question ${index + 1}</h6>
+                                <p class="mb-2 fw-medium">${escapeHtml(question.question)}</p>
+                                <small class="text-muted">
+                                    <strong>Category:</strong> ${escapeHtml(question.category)} | 
+                                    <strong>Description:</strong> ${escapeHtml(question.description)}
+                                </small>
+                            </div>
+                            <span class="badge bg-info ms-2">Custom</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // NFL questions have line_type structure
+                const badgeClass = question.line_type === 'spread' ? 'bg-primary' : 'bg-success';
+                const badgeText = question.line_type === 'spread' ? 'Spread' : 'Over/Under';
+                
+                html += `
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-2">Question ${index + 1}</h6>
+                                <p class="mb-2 fw-medium">${escapeHtml(question.question)}</p>
+                                <small class="text-muted">
+                                    <strong>Game:</strong> ${escapeHtml(question.game)} | 
+                                    <strong>Line:</strong> ${question.line_value}
+                                    ${question.team_favored ? ' | <strong>Favored:</strong> ' + escapeHtml(question.team_favored) : ''}
+                                </small>
+                            </div>
+                            <span class="badge ${badgeClass} ms-2">${badgeText}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+        
+        html += `
+                </div>
+            </div>
+            
+            <div class="alert alert-info mb-0">
+                <i class="bi bi-lightbulb"></i>
+                <strong>Review the questions above.</strong> If you're happy with them, click "Use These Questions" to create your contest. 
+                If you'd like different questions, click "Generate Different Questions" to try again.
+            </div>
+        `;
+        
+        modalPreviewContent.innerHTML = html;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Event listeners
+    previewBtn.addEventListener('click', startPreview);
+    modalRetryBtn.addEventListener('click', startPreview);
+    modalRegenerateBtn.addEventListener('click', startPreview);
+    
+    modalAcceptBtn.addEventListener('click', function() {
+        console.log('Accept button clicked');
+        console.log('lastGeneratedData:', lastGeneratedData);
+        
+        if (lastGeneratedData) {
+            // Validate that all required form fields are filled
+            const sport = document.querySelector('select[name="sport"]').value;
+            const questionCount = document.querySelector('input[name="question_count"]').value;
+            const timezone = document.querySelector('select[name="timezone"]').value;
+            
+            console.log('Form values:', { sport, questionCount, timezone });
+            
+            if (!sport || !questionCount || !timezone) {
+                alert('Please fill in all required fields before accepting the questions.');
+                return;
+            }
+            
+            if (questionCount < 1 || questionCount > 10) {
+                alert('Please enter a valid question count between 1 and 10.');
+                return;
+            }
+            
+            // Store the accepted questions in the form field
+            const acceptedQuestionsField = document.querySelector('input[name="accepted_questions"]');
+            console.log('Found accepted questions field:', acceptedQuestionsField);
+            
+            if (acceptedQuestionsField) {
+                const jsonData = JSON.stringify(lastGeneratedData);
+                acceptedQuestionsField.value = jsonData;
+                console.log('Set accepted questions value (first 100 chars):', jsonData.substring(0, 100));
+            } else {
+                alert('Error: Could not find form field. Please try again.');
+                return;
+            }
+            
+            // Close modal and submit form
+            console.log('Closing modal...');
+            previewModal.hide();
+            
+            // Create a new form with all the necessary data and submit it directly
+            setTimeout(function() {
+                console.log('Creating new form for submission...');
+                
+                // Create a new form element
+                const newForm = document.createElement('form');
+                newForm.method = 'POST';
+                newForm.action = window.location.pathname; // Current URL
+                
+                console.log('Form action:', newForm.action);
+                
+                // Add CSRF token
+                const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+                console.log('CSRF token found:', !!csrfToken);
+                
+                const csrfInput = document.createElement('input');
+                csrfInput.type = 'hidden';
+                csrfInput.name = 'csrf_token';
+                csrfInput.value = csrfToken;
+                newForm.appendChild(csrfInput);
+                
+                // Add all form fields
+                const generationType = document.querySelector('select[name="generation_type"]').value;
+                const formFields = [
+                    { name: 'generation_type', value: generationType },
+                    { name: 'question_count', value: questionCount },
+                    { name: 'timezone', value: timezone },
+                    { name: 'accepted_questions', value: JSON.stringify(lastGeneratedData) },
+                    { name: 'submit', value: 'Generate Contest' }
+                ];
+                
+                // Add generation-type specific fields
+                if (generationType === 'custom') {
+                    const customPrompt = document.querySelector('textarea[name="custom_prompt"]').value || '';
+                    formFields.push({ name: 'custom_prompt', value: customPrompt });
+                } else {
+                    // NFL fields
+                    formFields.push(
+                        { name: 'sport', value: sport },
+                        { name: 'week_number', value: document.querySelector('input[name="week_number"]').value || '' },
+                        { name: 'season_year', value: document.querySelector('input[name="season_year"]').value || '' }
+                    );
+                }
+                
+                console.log('Adding form fields:', formFields.length);
+                
+                formFields.forEach(field => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = field.name;
+                    input.value = field.value;
+                    newForm.appendChild(input);
+                    console.log(`Added field: ${field.name} = ${field.value.toString().substring(0, 50)}...`);
+                });
+                
+                // Add form to document and submit
+                document.body.appendChild(newForm);
+                console.log('Form added to document, submitting...');
+                console.log('Form HTML:', newForm.outerHTML.substring(0, 200) + '...');
+                
+                // Add a small delay to ensure DOM is ready
+                setTimeout(function() {
+                    console.log('Submitting form now...');
+                    newForm.submit();
+                    console.log('Form submitted!');
+                }, 100);
+                
+            }, 300);
+        } else {
+            console.error('No lastGeneratedData available');
+            alert('Error: No generated data available. Please try generating questions again.');
+        }
+    });
+    
+    // Form submission handling
+    document.getElementById('auto-generate-form').addEventListener('submit', function(e) {
+        console.log('Form submit event triggered');
+        console.log('Event:', e);
+        
+        const formProgress = document.getElementById('form-progress');
+        const cancelBtn = document.getElementById('cancel-btn');
+        
+        // Show progress indicator
+        formProgress.style.display = 'block';
+        
+        // Disable form elements
+        generateBtn.disabled = true;
+        generateBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Creating Contest...';
+        cancelBtn.style.display = 'none';
+        previewBtn.disabled = true;
+        
+        // Disable all form inputs
+        const formInputs = document.querySelectorAll('#auto-generate-form input, #auto-generate-form select');
+        formInputs.forEach(input => {
+            input.disabled = true;
+        });
+        
+        // Scroll to progress indicator
+        formProgress.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+});
+</script>
+{% endblock %}

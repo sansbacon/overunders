@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Leagues{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Leagues</h1>
+                {% if current_user %}
+                <div>
+                    <a href="{{ url_for('leagues.my_leagues') }}" class="btn btn-outline-primary me-2">My Leagues</a>
+                    <a href="{{ url_for('leagues.create_league') }}" class="btn btn-primary">Create League</a>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if leagues.items %}
+            <div class="row">
+                {% for league in leagues.items %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="text-decoration-none">
+                                    {{ league.league_name }}
+                                </a>
+                            </h5>
+                            
+                            {% if league.description %}
+                            <p class="card-text text-muted">{{ league.description[:100] }}{% if league.description|length > 100 %}...{% endif %}</p>
+                            {% endif %}
+                            
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <small class="text-muted">Members</small>
+                                    <div class="fw-bold">{{ league.get_member_count() }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Contests</small>
+                                    <div class="fw-bold">{{ league.get_contest_count() }}</div>
+                                </div>
+                                <div class="col-4">
+                                    <small class="text-muted">Win Bonus</small>
+                                    <div class="fw-bold">{{ league.win_bonus_points }}pts</div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    {% if league.is_public %}
+                                    <span class="badge bg-success">Public</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Private</span>
+                                    {% endif %}
+                                </div>
+                                
+                                {% if current_user %}
+                                    {% if league.is_member(current_user) %}
+                                    <span class="badge bg-primary">Member</span>
+                                    {% elif league.is_public %}
+                                    <form method="POST" action="{{ url_for('leagues.join_league', league_id=league.league_id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Join</button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-footer text-muted">
+                            <small>Created by {{ league.creator.username }} on {{ league.created_at|strftime('%b %d, %Y') }}</small>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Pagination -->
+            {% if leagues.pages > 1 %}
+            <nav aria-label="Leagues pagination">
+                <ul class="pagination justify-content-center">
+                    {% if leagues.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('leagues.list_leagues', page=leagues.prev_num) }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in leagues.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != leagues.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('leagues.list_leagues', page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if leagues.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('leagues.list_leagues', page=leagues.next_num) }}">Next</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="text-center py-5">
+                <h3 class="text-muted">No leagues found</h3>
+                <p class="text-muted">Be the first to create a league!</p>
+                {% if current_user %}
+                <a href="{{ url_for('leagues.create_league') }}" class="btn btn-primary">Create League</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

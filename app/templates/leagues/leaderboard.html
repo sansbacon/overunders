@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}{{ league.league_name }} - Leaderboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>{{ league.league_name }} Leaderboard</h1>
+                    <p class="text-muted">Overall standings across all league contests</p>
+                </div>
+                <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="btn btn-outline-primary">Back to League</a>
+            </div>
+
+            {% if leaderboard %}
+            <!-- Leaderboard Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">League Standings</h5>
+                    <small class="text-muted">Win bonus: {{ league.win_bonus_points }} points per contest win</small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player</th>
+                                    <th>Total Points</th>
+                                    <th>Contest Wins</th>
+                                    <th>Contests Played</th>
+                                    <th>Contests Completed</th>
+                                    <th>Win Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in leaderboard %}
+                                <tr>
+                                    <td>
+                                        {% if loop.index == 1 %}
+                                        <span class="badge bg-warning fs-6">🥇 {{ loop.index }}</span>
+                                        {% elif loop.index == 2 %}
+                                        <span class="badge bg-secondary fs-6">🥈 {{ loop.index }}</span>
+                                        {% elif loop.index == 3 %}
+                                        <span class="badge bg-warning fs-6">🥉 {{ loop.index }}</span>
+                                        {% else %}
+                                        <span class="fs-5">{{ loop.index }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ entry.user.get_display_name() }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary fs-6">{{ entry.total_points }}</span>
+                                    </td>
+                                    <td>{{ entry.contest_wins }}</td>
+                                    <td>{{ entry.contests_participated }}</td>
+                                    <td>{{ entry.contests_completed }}</td>
+                                    <td>
+                                        {% if entry.contests_completed > 0 %}
+                                        {{ "%.1f"|format((entry.contest_wins / entry.contests_completed) * 100) }}%
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contest Breakdown -->
+            {% if contests %}
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Contest Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for contest in contests %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">
+                                        <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="text-decoration-none">
+                                            {{ contest.contest_name }}
+                                        </a>
+                                    </h6>
+                                    <small class="text-muted">
+                                        {% if contest.is_locked() %}
+                                            {% if contest.has_all_answers() %}
+                                            <span class="badge bg-success">Completed</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">Locked</span>
+                                            {% endif %}
+                                        {% else %}
+                                        <span class="badge bg-primary">Open</span>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                                <div class="card-body">
+                                    {% if contest.is_locked() and contest.has_all_answers() %}
+                                    {% set contest_leaderboard = contest.get_leaderboard() %}
+                                    {% if contest_leaderboard %}
+                                    <div class="small">
+                                        <div class="d-flex justify-content-between">
+                                            <span>🥇 {{ contest_leaderboard[0].user.username }}</span>
+                                            <span>{{ contest_leaderboard[0].correct_answers }}pts</span>
+                                        </div>
+                                        {% if contest_leaderboard|length > 1 %}
+                                        <div class="d-flex justify-content-between text-muted">
+                                            <span>🥈 {{ contest_leaderboard[1].user.username }}</span>
+                                            <span>{{ contest_leaderboard[1].correct_answers }}pts</span>
+                                        </div>
+                                        {% endif %}
+                                        {% if contest_leaderboard|length > 2 %}
+                                        <div class="d-flex justify-content-between text-muted">
+                                            <span>🥉 {{ contest_leaderboard[2].user.username }}</span>
+                                            <span>{{ contest_leaderboard[2].correct_answers }}pts</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% else %}
+                                    <p class="text-muted small mb-0">Results pending</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% else %}
+            <!-- No Data -->
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <h3 class="text-muted">No completed contests yet</h3>
+                    <p class="text-muted">The leaderboard will appear once contests are completed and scored.</p>
+                    <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="btn btn-primary">Back to League</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

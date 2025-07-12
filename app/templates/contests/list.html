@@ -9,9 +9,14 @@
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-trophy"></i> Active Contests</h2>
                 {% if current_user %}
-                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Create Contest
-                </a>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Contest
+                    </a>
+                    <a href="{{ url_for('contests.auto_generate') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-magic"></i> Auto-Generate
+                    </a>
+                </div>
                 {% endif %}
             </div>
 
@@ -143,9 +148,14 @@
                 <h4 class="text-muted">No Active Contests</h4>
                 <p class="text-muted">There are currently no active contests available.</p>
                 {% if current_user %}
-                <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Create the First Contest
-                </a>
+                <div class="d-flex gap-2 justify-content-center">
+                    <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Create Contest
+                    </a>
+                    <a href="{{ url_for('contests.auto_generate') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-magic"></i> Auto-Generate
+                    </a>
+                </div>
                 {% else %}
                 <p class="text-muted">
                     <a href="{{ url_for('auth.login') }}">Login</a> to create contests.

@@ -16,6 +16,55 @@
                     </div>
                 </div>
                 <div class="card-body">
+                    <!-- AI-Generated Contest Notice -->
+                    {% if is_ai_generated %}
+                    <div class="alert alert-success mb-4">
+                        <div class="d-flex align-items-start">
+                            <i class="bi bi-magic me-2 mt-1"></i>
+                            <div class="flex-grow-1">
+                                <h5 class="alert-heading mb-2">AI-Generated Contest Ready!</h5>
+                                <p class="mb-2">
+                                    Your contest has been pre-populated with AI-generated questions and details. 
+                                    You can review and customize everything below before creating the contest.
+                                </p>
+                                <ul class="mb-0 small">
+                                    <li>Contest name and description are suggested based on the sport and timeframe</li>
+                                    <li>Lock time is automatically set before games begin</li>
+                                    <li>Questions are generated from realistic betting scenarios</li>
+                                    <li>Feel free to modify any details to match your preferences</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% elif title == 'Create Contest' %}
+                    <div class="alert alert-primary mb-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="alert-heading mb-2">
+                                    <i class="bi bi-magic"></i> Want to save time?
+                                </h5>
+                                <p class="mb-0">
+                                    Let our AI automatically generate NFL contest questions based on current betting lines and matchups. 
+                                    Perfect for quick, professional contests!
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <a href="{{ url_for('contests.auto_generate') }}" class="btn btn-primary">
+                                    <i class="bi bi-magic"></i> Auto-Generate Contest
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mb-4">
+                        <small class="text-muted">
+                            <i class="bi bi-dash-lg"></i> OR <i class="bi bi-dash-lg"></i>
+                        </small>
+                    </div>
+                    
+                    <h5 class="mb-3">Create Contest Manually</h5>
+                    {% endif %}
+
                     <form method="POST" id="contest-form">
                         {{ form.hidden_tag() }}
                         
@@ -102,13 +151,7 @@
                                         
                                         <div class="mb-3">
                                             <label class="form-label">Question</label>
-                                            <input type="text" 
-                                                   class="form-control{% if question_form.question_text.errors %} is-invalid{% endif %}"
-                                                   name="{{ question_form.question_text.name }}"
-                                                   id="{{ question_form.question_text.id }}"
-                                                   value="{{ question_form.question_text.data or '' }}"
-                                                   maxlength="500"
-                                                   required>
+                                            {{ question_form.question_text(class="form-control" + (" is-invalid" if question_form.question_text.errors else ""), maxlength="500", required=True) }}
                                             {% if question_form.question_text.errors %}
                                             <div class="invalid-feedback">
                                                 {% for error in question_form.question_text.errors %}{{ error }}{% endfor %}

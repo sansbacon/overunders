@@ -16,3 +16,4 @@ requests==2.31.0
 sentry-sdk[flask]==1.38.0
 psutil==5.9.6
 flask-limiter==3.5.0
+openai==0.28.1

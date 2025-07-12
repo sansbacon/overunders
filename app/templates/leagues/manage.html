@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Manage {{ league.league_name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>Manage {{ league.league_name }}</h1>
+                    <p class="text-muted">Add contests, manage members, and configure league settings</p>
+                </div>
+                <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" class="btn btn-outline-primary">Back to League</a>
+            </div>
+
+            <div class="row">
+                <!-- Add Contests -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Add Contest to League</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if add_contest_form.contest_id.choices %}
+                            <form method="POST">
+                                {{ add_contest_form.hidden_tag() }}
+                                <input type="hidden" name="add_contest" value="1">
+                                
+                                <div class="mb-3">
+                                    {{ add_contest_form.contest_id.label(class="form-label") }}
+                                    {{ add_contest_form.contest_id(class="form-select") }}
+                                    {% if add_contest_form.contest_id.errors %}
+                                        <div class="text-danger">
+                                            {% for error in add_contest_form.contest_id.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {{ add_contest_form.submit(class="btn btn-primary") }}
+                            </form>
+                            {% else %}
+                            <div class="text-center py-3">
+                                <p class="text-muted">No available contests to add.</p>
+                                <small class="text-muted">Only contests created by league members can be added.</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Current League Contests -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">League Contests</h5>
+                        </div>
+                        <div class="card-body">
+                            {% set league_contests = league.get_contests() %}
+                            {% if league_contests %}
+                            <div class="list-group list-group-flush">
+                                {% for contest in league_contests %}
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" class="text-decoration-none">
+                                                {{ contest.contest_name }}
+                                            </a>
+                                        </h6>
+                                        <small class="text-muted">
+                                            Created by {{ contest.creator.username }} | 
+                                            Lock: {{ contest.lock_timestamp|to_central_time|strftime('%b %d, %Y %I:%M %p') }}
+                                        </small>
+                                    </div>
+                                    <form method="POST" action="{{ url_for('leagues.remove_contest', league_id=league.league_id, contest_id=contest.contest_id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this contest from the league?')">Remove</button>
+                                    </form>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-3">
+                                <p class="text-muted">No contests in this league yet.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manage Members -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Invite Members</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {{ invite_form.hidden_tag() }}
+                                <input type="hidden" name="invite_members" value="1">
+                                
+                                <div class="mb-3">
+                                    {{ invite_form.email_addresses.label(class="form-label") }}
+                                    {{ invite_form.email_addresses(class="form-control", rows="4") }}
+                                    {% if invite_form.email_addresses.errors %}
+                                        <div class="text-danger">
+                                            {% for error in invite_form.email_addresses.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                {{ invite_form.submit(class="btn btn-success") }}
+                            </form>
+                            
+                            <div class="alert alert-info mt-3">
+                                <small><strong>Note:</strong> League invitations are not yet implemented. For now, share the league link with users to join if it's public.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Current Members -->
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">League Members ({{ members|length }})</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if members %}
+                            <div class="list-group list-group-flush">
+                                {% for member in members %}
+                                <div class="list-group-item px-0 d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>{{ member.get_display_name() }}</strong>
+                                        {% if league.created_by_user == member.user_id %}
+                                        <span class="badge bg-primary ms-2">Creator</span>
+                                        {% elif league.is_admin(member) %}
+                                        <span class="badge bg-info ms-2">Admin</span>
+                                        {% endif %}
+                                        <br>
+                                        <small class="text-muted">{{ member.email }}</small>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        {% if league.created_by_user != member.user_id %}
+                                        <button type="button" class="btn btn-sm btn-outline-info toggle-admin-btn" 
+                                                data-user-id="{{ member.user_id }}" 
+                                                data-is-admin="{{ league.is_admin(member)|lower }}">
+                                            {% if league.is_admin(member) %}Remove Admin{% else %}Make Admin{% endif %}
+                                        </button>
+                                        <form method="POST" action="{{ url_for('leagues.remove_member', league_id=league.league_id, user_id=member.user_id) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove {{ member.username }} from the league?')">Remove</button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <div class="text-center py-3">
+                                <p class="text-muted">No members yet.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle toggle admin buttons
+    document.querySelectorAll('.toggle-admin-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const userId = this.dataset.userId;
+            const isAdmin = this.dataset.isAdmin === 'true';
+            
+            fetch(`{{ url_for('leagues.toggle_admin', league_id=league.league_id, user_id=0) }}`.replace('0', userId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('meta[name=csrf-token]').getAttribute('content')
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update button text and data attribute
+                    this.dataset.isAdmin = data.is_admin;
+                    this.textContent = data.is_admin ? 'Remove Admin' : 'Make Admin';
+                    
+                    // Update badge
+                    const memberDiv = this.closest('.list-group-item');
+                    const existingBadge = memberDiv.querySelector('.badge.bg-info');
+                    if (data.is_admin && !existingBadge) {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-info ms-2';
+                        badge.textContent = 'Admin';
+                        memberDiv.querySelector('strong').appendChild(badge);
+                    } else if (!data.is_admin && existingBadge) {
+                        existingBadge.remove();
+                    }
+                    
+                    // Show success message (you might want to implement a toast notification)
+                    console.log(data.message);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while updating admin status.');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}
