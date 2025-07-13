@@ -56,6 +56,19 @@ class Config:
     
     # OpenAI configuration
     OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+    
+    # Content moderation configuration
+    AI_MODERATION_ENABLED = os.environ.get('AI_MODERATION_ENABLED', 'false').lower() in ['true', 'on', '1']
+    CONTENT_MODERATION_LOG_ENABLED = os.environ.get('CONTENT_MODERATION_LOG_ENABLED', 'true').lower() in ['true', 'on', '1']
+    AUTO_MODERATE_NEW_CONTENT = os.environ.get('AUTO_MODERATE_NEW_CONTENT', 'true').lower() in ['true', 'on', '1']
+    MODERATE_AI_GENERATED_CONTENT = os.environ.get('MODERATE_AI_GENERATED_CONTENT', 'true').lower() in ['true', 'on', '1']
+    
+    # Verification requirements configuration
+    REQUIRE_VERIFICATION_FOR_CONTESTS = os.environ.get('REQUIRE_VERIFICATION_FOR_CONTESTS', 'false').lower() in ['true', 'on', '1']
+    REQUIRE_VERIFICATION_FOR_LEAGUES = os.environ.get('REQUIRE_VERIFICATION_FOR_LEAGUES', 'false').lower() in ['true', 'on', '1']
+    ALLOW_UNVERIFIED_PARTICIPATION = os.environ.get('ALLOW_UNVERIFIED_PARTICIPATION', 'true').lower() in ['true', 'on', '1']
+    MINIMUM_VERIFICATION_LEVEL_CONTESTS = os.environ.get('MINIMUM_VERIFICATION_LEVEL_CONTESTS', 'basic')
+    MINIMUM_VERIFICATION_LEVEL_LEAGUES = os.environ.get('MINIMUM_VERIFICATION_LEVEL_LEAGUES', 'basic')
 
 
 class DevelopmentConfig(Config):

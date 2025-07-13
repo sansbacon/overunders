@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Content Moderation Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">Content Moderation Dashboard</h1>
+            
+            <!-- Moderation Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">{{ stats.total_logs }}</h4>
+                                    <p class="card-text">Total Logs</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-list fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">{{ stats.logs_today }}</h4>
+                                    <p class="card-text">Logs Today</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-calendar-day fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">{{ stats.pending_reports }}</h4>
+                                    <p class="card-text">Pending Reports</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-flag fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <h4 class="card-title">{{ stats.blocked_content_today }}</h4>
+                                    <p class="card-text">Blocked Today</p>
+                                </div>
+                                <div class="align-self-center">
+                                    <i class="fas fa-ban fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Moderation Status -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-robot"></i> AI Moderation Status
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if stats.ai_moderation_enabled %}
+                                <div class="alert alert-success">
+                                    <i class="fas fa-check-circle"></i>
+                                    AI moderation is <strong>enabled</strong>. Content is being automatically screened using OpenAI's moderation API.
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    AI moderation is <strong>disabled</strong>. Only basic keyword filtering is active.
+                                    <br><small>To enable AI moderation, set AI_MODERATION_ENABLED=true and provide a valid OPENAI_API_KEY.</small>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <a href="{{ url_for('moderation.reports') }}" class="btn btn-warning btn-block">
+                                        <i class="fas fa-flag"></i> Review Reports
+                                        {% if stats.pending_reports > 0 %}
+                                            <span class="badge badge-light">{{ stats.pending_reports }}</span>
+                                        {% endif %}
+                                    </a>
+                                </div>
+                                <div class="col-md-3">
+                                    <a href="{{ url_for('moderation.flagged_content') }}" class="btn btn-danger btn-block">
+                                        <i class="fas fa-exclamation-triangle"></i> Flagged Content
+                                    </a>
+                                </div>
+                                <div class="col-md-3">
+                                    <a href="{{ url_for('moderation.test_moderation') }}" class="btn btn-info btn-block">
+                                        <i class="fas fa-vial"></i> Test Moderation
+                                    </a>
+                                </div>
+                                <div class="col-md-3">
+                                    <a href="{{ url_for('moderation.settings') }}" class="btn btn-secondary btn-block">
+                                        <i class="fas fa-cog"></i> Settings
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content Type Breakdown -->
+            {% if content_type_stats %}
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Content Type Breakdown</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Content Type</th>
+                                            <th>Moderation Logs</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for content_type, count in content_type_stats %}
+                                        <tr>
+                                            <td>{{ content_type.title() }}</td>
+                                            <td>{{ count }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pending Reports -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Recent Pending Reports</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if pending_reports %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Reason</th>
+                                                <th>Reporter</th>
+                                                <th>Date</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for report in pending_reports[:5] %}
+                                            <tr>
+                                                <td>{{ report.content_type.title() }}</td>
+                                                <td>{{ report.report_reason }}</td>
+                                                <td>{{ report.reported_by.username }}</td>
+                                                <td>{{ report.created_at.strftime('%m/%d %H:%M') }}</td>
+                                                <td>
+                                                    <a href="{{ url_for('moderation.review_report', report_id=report.report_id) }}" 
+                                                       class="btn btn-sm btn-primary">Review</a>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% if pending_reports|length > 5 %}
+                                <div class="text-center">
+                                    <a href="{{ url_for('moderation.reports') }}" class="btn btn-sm btn-outline-primary">
+                                        View All Reports
+                                    </a>
+                                </div>
+                                {% endif %}
+                            {% else %}
+                                <p class="text-muted">No pending reports.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Recent Moderation Activity -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Recent Moderation Activity</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if recent_logs %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Content Type</th>
+                                                <th>Action</th>
+                                                <th>User</th>
+                                                <th>Content Preview</th>
+                                                <th>Result</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for log in recent_logs %}
+                                            <tr>
+                                                <td>{{ log.created_at.strftime('%m/%d %H:%M') }}</td>
+                                                <td>
+                                                    <span class="badge badge-secondary">{{ log.content_type }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if log.action_taken == 'blocked' %}
+                                                        <span class="badge badge-danger">{{ log.action_taken }}</span>
+                                                    {% elif log.action_taken == 'flagged' %}
+                                                        <span class="badge badge-warning">{{ log.action_taken }}</span>
+                                                    {% else %}
+                                                        <span class="badge badge-success">{{ log.action_taken }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if log.user %}
+                                                        {{ log.user.username }}
+                                                    {% else %}
+                                                        <em>System</em>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <small>{{ log.content_text[:50] }}{% if log.content_text|length > 50 %}...{% endif %}</small>
+                                                </td>
+                                                <td>
+                                                    {% if log.moderation_result.reason %}
+                                                        <small class="text-muted">{{ log.moderation_result.reason }}</small>
+                                                    {% else %}
+                                                        <small class="text-success">Clean</small>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="text-center">
+                                    <a href="{{ url_for('moderation.logs') }}" class="btn btn-outline-primary">
+                                        View All Logs
+                                    </a>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">No recent moderation activity.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -11,19 +11,30 @@
             <p class="lead">Create and participate in exciting Yes/No prediction contests with friends and the community.</p>
             {% if not current_user %}
             <hr class="my-4">
-            <p>Join now to start creating contests or participating in existing ones!</p>
+            <p>Join now to start creating contests, joining leagues, or generating AI-powered contests!</p>
             <a class="btn btn-light btn-lg" href="{{ url_for('auth.register') }}" role="button">
                 <i class="bi bi-person-plus"></i> Get Started
             </a>
             {% else %}
             <hr class="my-4">
-            <p>Ready to create your next contest or join an existing one?</p>
-            <a class="btn btn-light btn-lg me-2" href="{{ url_for('contests.create_contest') }}" role="button">
-                <i class="bi bi-plus-circle"></i> Create Contest
-            </a>
-            <a class="btn btn-outline-light btn-lg" href="{{ url_for('contests.list_contests') }}" role="button">
-                <i class="bi bi-list"></i> Browse Contests
-            </a>
+            <p>Ready to create contests, join competitive leagues, or let AI generate exciting predictions?</p>
+            <div class="d-flex flex-wrap gap-2 justify-content-center">
+                <a class="btn btn-light btn-lg" href="{{ url_for('contests.create_contest') }}" role="button">
+                    <i class="bi bi-plus-circle"></i> Create Contest
+                </a>
+                <a class="btn btn-outline-light btn-lg" href="{{ url_for('leagues.create_league') }}" role="button">
+                    <i class="bi bi-trophy"></i> Create League
+                </a>
+                <a class="btn btn-outline-light btn-lg" href="{{ url_for('contests.auto_generate') }}" role="button">
+                    <i class="bi bi-robot"></i> AI Generate
+                    {% if remaining_ai_contests > 0 %}
+                    <span class="badge bg-success ms-1">{{ remaining_ai_contests }}</span>
+                    {% endif %}
+                </a>
+                <a class="btn btn-outline-light btn-lg" href="{{ url_for('contests.list_contests') }}" role="button">
+                    <i class="bi bi-list"></i> Browse All
+                </a>
+            </div>
             {% endif %}
         </div>
     </div>
@@ -34,32 +45,338 @@
     <div class="col-12">
         <h2 class="text-center mb-4">How It Works</h2>
     </div>
-    <div class="col-md-4 mb-3">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
         <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-plus-circle-fill text-primary" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">Create Contests</h5>
-                <p class="card-text">Set up your own Yes/No prediction contests with custom questions and lock dates.</p>
+                <i class="bi bi-plus-circle-fill text-primary" style="font-size: 2.5rem;"></i>
+                <h6 class="card-title mt-3">Create Contests</h6>
+                <p class="card-text small">Set up your own Yes/No prediction contests with custom questions.</p>
             </div>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
         <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-people-fill text-success" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">Participate</h5>
-                <p class="card-text">Join contests created by others and make your Yes/No predictions before the lock date.</p>
+                <i class="bi bi-robot text-info" style="font-size: 2.5rem;"></i>
+                <h6 class="card-title mt-3">AI Generation</h6>
+                <p class="card-text small">Let AI create NFL betting contests or custom prediction challenges instantly.</p>
             </div>
         </div>
     </div>
-    <div class="col-md-4 mb-3">
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
         <div class="card h-100">
             <div class="card-body text-center">
-                <i class="bi bi-trophy-fill text-warning" style="font-size: 3rem;"></i>
-                <h5 class="card-title mt-3">Compete</h5>
-                <p class="card-text">See how you rank against other participants on the leaderboard after contests lock.</p>
+                <i class="bi bi-trophy-fill text-warning" style="font-size: 2.5rem;"></i>
+                <h6 class="card-title mt-3">Join Leagues</h6>
+                <p class="card-text small">Compete in ongoing leagues with leaderboards and bonus points for wins.</p>
             </div>
         </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-people-fill text-success" style="font-size: 2.5rem;"></i>
+                <h6 class="card-title mt-3">Participate</h6>
+                <p class="card-text small">Join contests and make your Yes/No predictions before the lock date.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up text-danger" style="font-size: 2.5rem;"></i>
+                <h6 class="card-title mt-3">Track Progress</h6>
+                <p class="card-text small">View leaderboards, track your performance, and climb the rankings.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Featured Leagues Section -->
+{% if featured_leagues %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3><i class="bi bi-trophy text-warning"></i> Featured Leagues</h3>
+            <a href="{{ url_for('leagues.list_leagues') }}" class="btn btn-outline-warning">
+                View All Leagues <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+        
+        <div class="row">
+            {% for league in featured_leagues %}
+            <div class="col-md-4 mb-3">
+                <div class="card border-warning h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-trophy text-warning me-2"></i>{{ league.league_name }}
+                        </h5>
+                        <p class="card-text">{{ league.description[:80] if league.description else 'Competitive league for prediction contests.' }}{% if league.description and league.description|length > 80 %}...{% endif %}</p>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person-badge"></i> Created by {{ league.creator.username }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-people"></i> {{ league.get_member_count() }} Members
+                            </span>
+                            <span class="badge bg-info">
+                                <i class="bi bi-list-check"></i> {{ league.get_contest_count() }} Contests
+                            </span>
+                            {% if league.is_public %}
+                            <span class="badge bg-success">Public</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" 
+                           class="btn btn-warning btn-sm">
+                            <i class="bi bi-eye"></i> View League
+                        </a>
+                        {% if current_user and league.is_public and not league.is_member(current_user) %}
+                        <a href="{{ url_for('leagues.join_league', league_id=league.league_id) }}" 
+                           class="btn btn-outline-warning btn-sm"
+                           onclick="return confirm('Join this league?')">
+                            <i class="bi bi-plus"></i> Join
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- AI-Generated Contests Section -->
+{% if ai_contests %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3><i class="bi bi-robot text-info"></i> AI-Generated Contests</h3>
+            <div>
+                {% if total_ai_contests > 0 %}
+                <small class="text-muted me-3">{{ total_ai_contests }} total AI contests created</small>
+                {% endif %}
+                <a href="{{ url_for('contests.auto_generate') }}" class="btn btn-outline-info">
+                    <i class="bi bi-robot"></i> Generate New
+                </a>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% for contest in ai_contests %}
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card border-info h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="bi bi-robot text-info me-1"></i>{{ contest.contest_name }}
+                        </h6>
+                        <p class="card-text small">{{ contest.description[:80] }}{% if contest.description|length > 80 %}...{% endif %}</p>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person"></i> {{ contest.creator.username }}
+                                <span class="badge bg-info ms-1">AI</span>
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            {% if contest.is_locked() %}
+                                <span class="badge bg-danger">Locked</span>
+                            {% else %}
+                                <span class="badge bg-success">Open</span>
+                            {% endif %}
+                            <span class="badge bg-secondary">{{ contest.questions.count() }} Questions</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="{{ url_for('contests.view_contest', contest_id=contest.contest_id) }}" 
+                           class="btn btn-info btn-sm">
+                            View Contest
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Quick Actions Section -->
+{% if current_user %}
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title text-center mb-4">
+                    <i class="bi bi-lightning-charge text-primary"></i> Quick Actions
+                </h5>
+                <div class="row text-center">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('contests.create_contest') }}" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-circle d-block mb-2" style="font-size: 2rem;"></i>
+                            Create Contest
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('contests.auto_generate') }}" class="btn btn-info w-100">
+                            <i class="bi bi-robot d-block mb-2" style="font-size: 2rem;"></i>
+                            AI Generate
+                            {% if remaining_ai_contests > 0 %}
+                            <br><small class="badge bg-success">{{ remaining_ai_contests }} left today</small>
+                            {% endif %}
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('leagues.create_league') }}" class="btn btn-warning w-100">
+                            <i class="bi bi-trophy d-block mb-2" style="font-size: 2rem;"></i>
+                            Create League
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('leagues.my_leagues') }}" class="btn btn-success w-100">
+                            <i class="bi bi-list-stars d-block mb-2" style="font-size: 2rem;"></i>
+                            My Leagues
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Active Leagues Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3><i class="bi bi-trophy text-warning"></i> Active Leagues</h3>
+            <a href="{{ url_for('leagues.list_leagues') }}" class="btn btn-outline-warning">
+                View All <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+        
+        {% if active_leagues.items %}
+        <div class="row">
+            {% for league in active_leagues.items %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card border-warning h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-trophy text-warning me-2"></i>{{ league.league_name }}
+                        </h5>
+                        <p class="card-text">{{ league.description[:100] if league.description else 'Competitive league for prediction contests.' }}{% if league.description and league.description|length > 100 %}...{% endif %}</p>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-person-badge"></i> Created by {{ league.creator.username }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="bi bi-calendar"></i> 
+                                Created: {{ league.created_at.strftime('%Y-%m-%d') }}
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-people"></i> {{ league.get_member_count() }} Members
+                            </span>
+                            <span class="badge bg-info">
+                                <i class="bi bi-list-check"></i> {{ league.get_contest_count() }} Contests
+                            </span>
+                            {% if league.is_public %}
+                            <span class="badge bg-success">Public</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Private</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <a href="{{ url_for('leagues.view_league', league_id=league.league_id) }}" 
+                           class="btn btn-warning btn-sm">
+                            <i class="bi bi-eye"></i> View League
+                        </a>
+                        
+                        {% if current_user and league.is_public and not league.is_member(current_user) %}
+                        <a href="{{ url_for('leagues.join_league', league_id=league.league_id) }}" 
+                           class="btn btn-outline-warning btn-sm"
+                           onclick="return confirm('Join this league?')">
+                            <i class="bi bi-plus"></i> Join
+                        </a>
+                        {% endif %}
+                        
+                        {% if current_user and league.is_member(current_user) %}
+                        <span class="badge bg-success ms-2">
+                            <i class="bi bi-check-circle"></i> Member
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- League Pagination -->
+        {% if active_leagues.pages > 1 %}
+        <nav aria-label="League pagination">
+            <ul class="pagination justify-content-center">
+                {% if active_leagues.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.index', leagues_page=active_leagues.prev_num) }}">Previous</a>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in active_leagues.iter_pages() %}
+                    {% if page_num %}
+                        {% if page_num != active_leagues.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('main.index', leagues_page=page_num) }}">{{ page_num }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if active_leagues.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('main.index', leagues_page=active_leagues.next_num) }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+        
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-trophy text-muted" style="font-size: 4rem;"></i>
+            <h4 class="text-muted mt-3">No Active Leagues</h4>
+            <p class="text-muted">Be the first to create a league!</p>
+            {% if current_user %}
+            <a href="{{ url_for('leagues.create_league') }}" class="btn btn-warning">
+                <i class="bi bi-plus-circle"></i> Create League
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -79,12 +396,20 @@
             <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card h-100">
                     <div class="card-body">
-                        <h5 class="card-title">{{ contest.contest_name }}</h5>
+                        <h5 class="card-title">
+                            {% if contest.is_ai_generated %}
+                            <i class="bi bi-robot text-info me-1"></i>
+                            {% endif %}
+                            {{ contest.contest_name }}
+                        </h5>
                         <p class="card-text">{{ contest.description[:100] }}{% if contest.description|length > 100 %}...{% endif %}</p>
                         
                         <div class="mb-2">
                             <small class="text-muted">
                                 <i class="bi bi-person"></i> {{ contest.creator.username }}
+                                {% if contest.is_ai_generated %}
+                                <span class="badge bg-info ms-1">AI</span>
+                                {% endif %}
                             </small>
                         </div>
                         

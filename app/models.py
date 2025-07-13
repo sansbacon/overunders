@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 import secrets
+import json
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 
@@ -28,6 +29,13 @@ class User(db.Model):
     google_name = db.Column(db.String(100), nullable=True)
     google_picture = db.Column(db.String(500), nullable=True)
     auth_provider = db.Column(db.String(20), default='email', nullable=False)  # 'email', 'google'
+    
+    # Moderation and trust fields
+    trust_score = db.Column(db.Integer, default=100, nullable=False)  # 0-100 trust score
+    warning_count = db.Column(db.Integer, default=0, nullable=False)  # Number of warnings received
+    is_suspended = db.Column(db.Boolean, default=False, nullable=False)  # Whether user is suspended
+    suspended_until = db.Column(db.DateTime, nullable=True)  # When suspension expires
+    suspension_reason = db.Column(db.Text, nullable=True)  # Reason for suspension
     
     # Relationships
     contests = db.relationship('Contest', backref='creator', lazy='dynamic')
@@ -169,6 +177,13 @@ class Contest(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_ai_generated = db.Column(db.Boolean, default=False, nullable=False)
     
+    # Moderation fields
+    moderation_status = db.Column(db.String(20), default='approved', nullable=False)  # 'approved', 'flagged', 'blocked', 'pending'
+    moderation_notes = db.Column(db.Text, nullable=True)  # Notes from moderation review
+    flagged_at = db.Column(db.DateTime, nullable=True)  # When content was flagged
+    reviewed_at = db.Column(db.DateTime, nullable=True)  # When content was reviewed
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Who reviewed it
+    
     # Relationships
     questions = db.relationship('Question', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
     entries = db.relationship('ContestEntry', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
@@ -290,6 +305,13 @@ class Question(db.Model):
     question_order = db.Column(db.Integer, nullable=False)
     correct_answer = db.Column(db.Boolean, nullable=True)  # True for Yes, False for No, None if not set yet
     answer_set_at = db.Column(db.DateTime, nullable=True)  # When the answer was set
+    
+    # Moderation fields
+    moderation_status = db.Column(db.String(20), default='approved', nullable=False)  # 'approved', 'flagged', 'blocked', 'pending'
+    moderation_notes = db.Column(db.Text, nullable=True)  # Notes from moderation review
+    flagged_at = db.Column(db.DateTime, nullable=True)  # When content was flagged
+    reviewed_at = db.Column(db.DateTime, nullable=True)  # When content was reviewed
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Who reviewed it
     
     # Relationships
     answers = db.relationship('EntryAnswer', backref='question', lazy='dynamic', cascade='all, delete-orphan')
@@ -557,6 +579,13 @@ class League(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_public = db.Column(db.Boolean, default=False, nullable=False)
     win_bonus_points = db.Column(db.Integer, default=5, nullable=False)
+    
+    # Moderation fields
+    moderation_status = db.Column(db.String(20), default='approved', nullable=False)  # 'approved', 'flagged', 'blocked', 'pending'
+    moderation_notes = db.Column(db.Text, nullable=True)  # Notes from moderation review
+    flagged_at = db.Column(db.DateTime, nullable=True)  # When content was flagged
+    reviewed_at = db.Column(db.DateTime, nullable=True)  # When content was reviewed
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)  # Who reviewed it
     
     # Relationships
     creator = db.relationship('User', backref='created_leagues', foreign_keys=[created_by_user])
@@ -829,3 +858,481 @@ class LoginToken(db.Model):
         for token in expired_tokens:
             db.session.delete(token)
         db.session.commit()
+
+
+class ContentModerationLog(db.Model):
+    """Model for content moderation logs."""
+    
+    __tablename__ = 'content_moderation_logs'
+    
+    log_id = db.Column(db.Integer, primary_key=True)
+    content_type = db.Column(db.String(50), nullable=False)  # 'contest', 'league', 'question', etc.
+    content_id = db.Column(db.Integer, nullable=True)  # ID of the content being moderated
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    content_text = db.Column(db.Text, nullable=False)  # The actual text that was moderated
+    moderation_result = db.Column(db.JSON, nullable=False)  # JSON result from moderation
+    action_taken = db.Column(db.String(50), nullable=False)  # 'approved', 'flagged', 'blocked', 'reviewed'
+    moderator_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='moderation_logs')
+    moderator = db.relationship('User', foreign_keys=[moderator_id], backref='moderation_actions')
+    
+    def __repr__(self) -> str:
+        """String representation of ContentModerationLog."""
+        return f'<ContentModerationLog {self.log_id}: {self.content_type} - {self.action_taken}>'
+    
+    @classmethod
+    def log_moderation(cls, content_type: str, content_text: str, moderation_result: dict,
+                      action_taken: str, content_id: int = None, user_id: int = None,
+                      moderator_id: int = None):
+        """Create a moderation log entry.
+        
+        Args:
+            content_type (str): Type of content being moderated
+            content_text (str): The text content
+            moderation_result (dict): Result from moderation check
+            action_taken (str): Action taken based on moderation
+            content_id (int, optional): ID of the content
+            user_id (int, optional): ID of user who created content
+            moderator_id (int, optional): ID of moderator who reviewed
+        """
+        log_entry = cls(
+            content_type=content_type,
+            content_id=content_id,
+            user_id=user_id,
+            content_text=content_text,
+            moderation_result=moderation_result,
+            action_taken=action_taken,
+            moderator_id=moderator_id
+        )
+        db.session.add(log_entry)
+        db.session.commit()
+        return log_entry
+
+
+class ContentReport(db.Model):
+    """Model for user reports of inappropriate content."""
+    
+    __tablename__ = 'content_reports'
+    
+    report_id = db.Column(db.Integer, primary_key=True)
+    content_type = db.Column(db.String(50), nullable=False)  # 'contest', 'league', 'question', etc.
+    content_id = db.Column(db.Integer, nullable=False)  # ID of the reported content
+    reported_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    report_reason = db.Column(db.String(100), nullable=False)  # 'spam', 'inappropriate', 'offensive', etc.
+    report_description = db.Column(db.Text, nullable=True)  # Additional details from reporter
+    status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'reviewed', 'dismissed', 'action_taken'
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    review_notes = db.Column(db.Text, nullable=True)  # Notes from moderator review
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    reported_by = db.relationship('User', foreign_keys=[reported_by_user_id], backref='reports_made')
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_user_id], backref='reports_reviewed')
+    
+    def __repr__(self) -> str:
+        """String representation of ContentReport."""
+        return f'<ContentReport {self.report_id}: {self.content_type} {self.content_id} - {self.status}>'
+    
+    def mark_reviewed(self, reviewer_id: int, status: str, notes: str = None):
+        """Mark report as reviewed.
+        
+        Args:
+            reviewer_id (int): ID of reviewing moderator
+            status (str): New status for the report
+            notes (str, optional): Review notes
+        """
+        self.reviewed_by_user_id = reviewer_id
+        self.status = status
+        self.review_notes = notes
+        self.reviewed_at = datetime.utcnow()
+        db.session.commit()
+
+
+class UserWarning(db.Model):
+    """Model for user warnings and disciplinary actions."""
+    
+    __tablename__ = 'user_warnings'
+    
+    warning_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    issued_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    warning_type = db.Column(db.String(50), nullable=False)  # 'content_violation', 'spam', 'harassment', etc.
+    reason = db.Column(db.Text, nullable=False)  # Detailed reason for warning
+    content_type = db.Column(db.String(50), nullable=True)  # Related content type if applicable
+    content_id = db.Column(db.Integer, nullable=True)  # Related content ID if applicable
+    severity = db.Column(db.String(20), nullable=False)  # 'low', 'medium', 'high', 'critical'
+    is_active = db.Column(db.Boolean, default=True, nullable=False)  # Whether warning is still active
+    expires_at = db.Column(db.DateTime, nullable=True)  # When warning expires (if applicable)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='warnings_received')
+    issued_by = db.relationship('User', foreign_keys=[issued_by_user_id], backref='warnings_issued')
+    
+    def __repr__(self) -> str:
+        """String representation of UserWarning."""
+        return f'<UserWarning {self.warning_id}: {self.warning_type} - {self.severity}>'
+    
+    def is_expired(self) -> bool:
+        """Check if warning has expired.
+        
+        Returns:
+            bool: True if warning has expired
+        """
+        if not self.expires_at:
+            return False
+        return datetime.utcnow() > self.expires_at
+    
+    def deactivate(self):
+        """Deactivate the warning."""
+        self.is_active = False
+        db.session.commit()
+
+
+class UserVerification(db.Model):
+    """Model for user verification requests and status."""
+    
+    __tablename__ = 'user_verifications'
+    
+    verification_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    verification_type = db.Column(db.String(50), nullable=False)  # 'identity', 'email', 'phone', 'document'
+    verification_level = db.Column(db.String(20), nullable=False)  # 'basic', 'enhanced', 'premium'
+    status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'approved', 'rejected', 'expired'
+    
+    # Verification data
+    submitted_data = db.Column(db.JSON, nullable=True)  # Data submitted for verification
+    verification_method = db.Column(db.String(50), nullable=True)  # Method used for verification
+    verification_notes = db.Column(db.Text, nullable=True)  # Notes about verification process
+    
+    # Admin review
+    reviewed_by_user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=True)
+    review_notes = db.Column(db.Text, nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
+    requested_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
+    
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref='verification_requests')
+    reviewed_by = db.relationship('User', foreign_keys=[reviewed_by_user_id], backref='verifications_reviewed')
+    
+    def __repr__(self) -> str:
+        """String representation of UserVerification."""
+        return f'<UserVerification {self.verification_id}: {self.user_id} - {self.verification_level} - {self.status}>'
+    
+    def is_active(self) -> bool:
+        """Check if verification is currently active.
+        
+        Returns:
+            bool: True if verification is active and not expired
+        """
+        if self.status != 'approved':
+            return False
+        
+        if self.expires_at and datetime.utcnow() > self.expires_at:
+            return False
+        
+        return True
+    
+    def approve(self, reviewer_id: int, notes: str = None, expires_in_days: int = None):
+        """Approve the verification request.
+        
+        Args:
+            reviewer_id (int): ID of the reviewing admin
+            notes (str, optional): Review notes
+            expires_in_days (int, optional): Days until verification expires
+        """
+        self.status = 'approved'
+        self.reviewed_by_user_id = reviewer_id
+        self.review_notes = notes
+        self.reviewed_at = datetime.utcnow()
+        self.approved_at = datetime.utcnow()
+        
+        if expires_in_days:
+            self.expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+        
+        db.session.commit()
+    
+    def reject(self, reviewer_id: int, notes: str = None):
+        """Reject the verification request.
+        
+        Args:
+            reviewer_id (int): ID of the reviewing admin
+            notes (str, optional): Review notes explaining rejection
+        """
+        self.status = 'rejected'
+        self.reviewed_by_user_id = reviewer_id
+        self.review_notes = notes
+        self.reviewed_at = datetime.utcnow()
+        db.session.commit()
+    
+    @classmethod
+    def get_user_verifications(cls, user_id: int, active_only: bool = True) -> List['UserVerification']:
+        """Get verifications for a user.
+        
+        Args:
+            user_id (int): User ID
+            active_only (bool): Whether to return only active verifications
+            
+        Returns:
+            List[UserVerification]: List of user verifications
+        """
+        query = cls.query.filter_by(user_id=user_id)
+        
+        if active_only:
+            query = query.filter_by(status='approved')
+        
+        return query.order_by(cls.requested_at.desc()).all()
+    
+    @classmethod
+    def get_highest_verification_level(cls, user_id: int) -> Optional[str]:
+        """Get the highest active verification level for a user.
+        
+        Args:
+            user_id (int): User ID
+            
+        Returns:
+            Optional[str]: Highest verification level or None if no active verifications
+        """
+        verifications = cls.get_user_verifications(user_id, active_only=True)
+        active_verifications = [v for v in verifications if v.is_active()]
+        
+        if not active_verifications:
+            return None
+        
+        # Define level hierarchy
+        level_hierarchy = {'basic': 1, 'enhanced': 2, 'premium': 3}
+        
+        highest_level = None
+        highest_rank = 0
+        
+        for verification in active_verifications:
+            rank = level_hierarchy.get(verification.verification_level, 0)
+            if rank > highest_rank:
+                highest_rank = rank
+                highest_level = verification.verification_level
+        
+        return highest_level
+
+
+class UserReputation(db.Model):
+    """Model for tracking user reputation and trust metrics."""
+    
+    __tablename__ = 'user_reputations'
+    
+    reputation_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False, unique=True)
+    
+    # Core reputation metrics
+    reputation_score = db.Column(db.Integer, default=100, nullable=False)  # Base reputation score
+    trust_level = db.Column(db.String(20), default='new', nullable=False)  # 'new', 'trusted', 'veteran', 'expert'
+    
+    # Activity metrics
+    contests_created = db.Column(db.Integer, default=0, nullable=False)
+    contests_participated = db.Column(db.Integer, default=0, nullable=False)
+    leagues_created = db.Column(db.Integer, default=0, nullable=False)
+    leagues_joined = db.Column(db.Integer, default=0, nullable=False)
+    
+    # Performance metrics
+    contest_wins = db.Column(db.Integer, default=0, nullable=False)
+    top_3_finishes = db.Column(db.Integer, default=0, nullable=False)
+    total_contest_points = db.Column(db.Integer, default=0, nullable=False)
+    average_accuracy = db.Column(db.Float, default=0.0, nullable=False)
+    
+    # Community metrics
+    positive_feedback_count = db.Column(db.Integer, default=0, nullable=False)
+    negative_feedback_count = db.Column(db.Integer, default=0, nullable=False)
+    helpful_votes = db.Column(db.Integer, default=0, nullable=False)
+    
+    # Moderation metrics
+    content_flags_received = db.Column(db.Integer, default=0, nullable=False)
+    warnings_received = db.Column(db.Integer, default=0, nullable=False)
+    suspensions_count = db.Column(db.Integer, default=0, nullable=False)
+    
+    # Verification status
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    verification_level = db.Column(db.String(20), nullable=True)  # 'basic', 'enhanced', 'premium'
+    verified_at = db.Column(db.DateTime, nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_activity_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='reputation', uselist=False)
+    
+    def __repr__(self) -> str:
+        """String representation of UserReputation."""
+        return f'<UserReputation {self.user_id}: {self.reputation_score} - {self.trust_level}>'
+    
+    def calculate_reputation_score(self) -> int:
+        """Calculate reputation score based on various factors.
+        
+        Returns:
+            int: Calculated reputation score
+        """
+        base_score = 100
+        
+        # Activity bonuses
+        activity_bonus = min(50, (self.contests_created * 5) + (self.contests_participated * 2))
+        
+        # Performance bonuses
+        performance_bonus = (self.contest_wins * 10) + (self.top_3_finishes * 5)
+        
+        # Community bonuses
+        community_bonus = (self.positive_feedback_count * 2) + self.helpful_votes
+        
+        # Verification bonus
+        verification_bonus = 0
+        if self.is_verified:
+            verification_bonus = {'basic': 20, 'enhanced': 40, 'premium': 60}.get(self.verification_level, 0)
+        
+        # Penalties
+        moderation_penalty = (self.content_flags_received * 5) + (self.warnings_received * 10) + (self.suspensions_count * 25)
+        negative_feedback_penalty = self.negative_feedback_count * 3
+        
+        # Calculate final score
+        calculated_score = (base_score + activity_bonus + performance_bonus + 
+                          community_bonus + verification_bonus - 
+                          moderation_penalty - negative_feedback_penalty)
+        
+        return max(0, min(1000, calculated_score))  # Clamp between 0 and 1000
+    
+    def update_trust_level(self):
+        """Update trust level based on reputation score and other factors."""
+        score = self.reputation_score
+        
+        if score >= 500 and self.contests_created >= 10 and self.is_verified:
+            self.trust_level = 'expert'
+        elif score >= 300 and self.contests_participated >= 20:
+            self.trust_level = 'veteran'
+        elif score >= 150 and self.contests_participated >= 5:
+            self.trust_level = 'trusted'
+        else:
+            self.trust_level = 'new'
+    
+    def update_verification_status(self):
+        """Update verification status based on latest verification records."""
+        latest_verification = UserVerification.query.filter_by(
+            user_id=self.user_id,
+            status='approved'
+        ).order_by(UserVerification.approved_at.desc()).first()
+        
+        if latest_verification and latest_verification.is_active():
+            self.is_verified = True
+            self.verification_level = latest_verification.verification_level
+            self.verified_at = latest_verification.approved_at
+        else:
+            self.is_verified = False
+            self.verification_level = None
+            self.verified_at = None
+    
+    def refresh_metrics(self):
+        """Refresh all reputation metrics from current data."""
+        # Update activity metrics
+        self.contests_created = Contest.query.filter_by(created_by_user=self.user_id).count()
+        self.contests_participated = ContestEntry.query.filter_by(user_id=self.user_id).count()
+        self.leagues_created = League.query.filter_by(created_by_user=self.user_id).count()
+        self.leagues_joined = LeagueMembership.query.filter_by(user_id=self.user_id).count()
+        
+        # Update moderation metrics
+        self.warnings_received = UserWarning.query.filter_by(user_id=self.user_id, is_active=True).count()
+        
+        # Update verification status
+        self.update_verification_status()
+        
+        # Recalculate reputation score
+        self.reputation_score = self.calculate_reputation_score()
+        
+        # Update trust level
+        self.update_trust_level()
+        
+        # Update timestamp
+        self.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+    
+    @classmethod
+    def get_or_create(cls, user_id: int) -> 'UserReputation':
+        """Get or create reputation record for a user.
+        
+        Args:
+            user_id (int): User ID
+            
+        Returns:
+            UserReputation: User's reputation record
+        """
+        reputation = cls.query.filter_by(user_id=user_id).first()
+        
+        if not reputation:
+            reputation = cls(user_id=user_id)
+            db.session.add(reputation)
+            db.session.commit()
+            reputation.refresh_metrics()
+        
+        return reputation
+    
+    @classmethod
+    def update_user_activity(cls, user_id: int):
+        """Update user's last activity timestamp.
+        
+        Args:
+            user_id (int): User ID
+        """
+        reputation = cls.get_or_create(user_id)
+        reputation.last_activity_at = datetime.utcnow()
+        db.session.commit()
+
+
+class ReputationHistory(db.Model):
+    """Model for tracking reputation score changes over time."""
+    
+    __tablename__ = 'reputation_history'
+    
+    history_id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    old_score = db.Column(db.Integer, nullable=False)
+    new_score = db.Column(db.Integer, nullable=False)
+    change_reason = db.Column(db.String(100), nullable=False)  # 'contest_win', 'verification', 'warning', etc.
+    change_details = db.Column(db.JSON, nullable=True)  # Additional details about the change
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='reputation_history')
+    
+    def __repr__(self) -> str:
+        """String representation of ReputationHistory."""
+        change = self.new_score - self.old_score
+        return f'<ReputationHistory {self.user_id}: {change:+d} ({self.change_reason})>'
+    
+    @classmethod
+    def log_change(cls, user_id: int, old_score: int, new_score: int, 
+                   reason: str, details: dict = None):
+        """Log a reputation score change.
+        
+        Args:
+            user_id (int): User ID
+            old_score (int): Previous reputation score
+            new_score (int): New reputation score
+            reason (str): Reason for the change
+            details (dict, optional): Additional details
+        """
+        if old_score != new_score:  # Only log if there's actually a change
+            history_entry = cls(
+                user_id=user_id,
+                old_score=old_score,
+                new_score=new_score,
+                change_reason=reason,
+                change_details=details
+            )
+            db.session.add(history_entry)
+            db.session.commit()

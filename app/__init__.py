@@ -68,6 +68,9 @@ def create_app(config_name=None):
     from app.routes.health import health as health_blueprint
     app.register_blueprint(health_blueprint)
     
+    from app.routes.moderation import moderation_bp
+    app.register_blueprint(moderation_bp)
+    
     # Register template filters
     from app.utils.timezone import convert_from_utc
     

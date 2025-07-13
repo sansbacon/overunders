@@ -7,6 +7,7 @@ from wtforms.validators import DataRequired, Length, Optional, NumberRange
 from app import db
 from app.models import League, LeagueMembership, LeagueContest, Contest, User
 from app.utils.decorators import login_required, get_current_user
+from app.utils.verification_checks import VerificationChecker, VerificationDecorator
 
 leagues = Blueprint('leagues', __name__)
 
@@ -154,8 +155,14 @@ def create_league():
     Returns:
         Rendered template for league creation or redirect after creation
     """
-    form = LeagueForm()
+    # Check verification requirements
     current_user = get_current_user()
+    can_create, reason = VerificationChecker.can_create_league(current_user.user_id)
+    if not can_create:
+        flash(reason, 'warning')
+        return redirect(url_for('verification.request_verification'))
+    
+    form = LeagueForm()
     
     if form.validate_on_submit():
         # Create league
@@ -235,6 +242,15 @@ def join_league(league_id):
     """
     league = League.query.get_or_404(league_id)
     current_user = get_current_user()
+    
+    # Check verification requirements for participation
+    can_join, reason = VerificationChecker.can_join_league(current_user.user_id, league_id)
+    if not can_join:
+        flash(reason, 'warning')
+        if 'verification' in reason.lower():
+            return redirect(url_for('verification.request_verification'))
+        else:
+            return redirect(url_for('leagues.view_league', league_id=league_id))
     
     # Check if league is public or user has permission
     if not league.is_public:
