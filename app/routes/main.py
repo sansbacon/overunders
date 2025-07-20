@@ -4,7 +4,7 @@ from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import Length, Optional
 from app import db
-from app.models import Contest, User
+from app.models import Contest, User, League
 from app.utils.decorators import get_current_user, login_required
 import os
 
@@ -22,7 +22,7 @@ class EditProfileForm(FlaskForm):
 
 @main.route('/')
 def index():
-    """Home page showing active contests.
+    """Home page showing active contests, featured leagues, and AI contest highlights.
     
     Returns:
         Rendered template for home page
@@ -30,7 +30,7 @@ def index():
     try:
         # Get active contests, ordered by creation date (newest first)
         page = request.args.get('page', 1, type=int)
-        per_page = 10
+        per_page = 6  # Reduced to make room for other sections
         
         contests = Contest.query.filter_by(is_active=True)\
                               .order_by(Contest.created_at.desc())\
@@ -38,9 +38,40 @@ def index():
         
         current_user = get_current_user()
         
+        # Get featured public leagues (top 3 by member count)
+        featured_leagues = League.query.filter_by(is_active=True, is_public=True)\
+                                     .join(League.memberships)\
+                                     .group_by(League.league_id)\
+                                     .order_by(db.func.count(League.memberships).desc())\
+                                     .limit(3).all()
+        
+        # Get active leagues for main display (similar pagination as contests)
+        leagues_page = request.args.get('leagues_page', 1, type=int)
+        active_leagues = League.query.filter_by(is_active=True)\
+                                   .order_by(League.created_at.desc())\
+                                   .paginate(page=leagues_page, per_page=6, error_out=False)
+        
+        # Get recent AI-generated contests (last 5)
+        ai_contests = Contest.query.filter_by(is_active=True, is_ai_generated=True)\
+                                 .order_by(Contest.created_at.desc())\
+                                 .limit(5).all()
+        
+        # Calculate AI contest statistics
+        total_ai_contests = Contest.query.filter_by(is_ai_generated=True).count()
+        
+        # Get user's remaining AI contests if logged in
+        remaining_ai_contests = 0
+        if current_user:
+            remaining_ai_contests = current_user.get_remaining_ai_contests_today()
+        
         return render_template('index.html', 
                              contests=contests, 
-                             current_user=current_user)
+                             current_user=current_user,
+                             featured_leagues=featured_leagues,
+                             active_leagues=active_leagues,
+                             ai_contests=ai_contests,
+                             total_ai_contests=total_ai_contests,
+                             remaining_ai_contests=remaining_ai_contests)
     except Exception as e:
         # Log the error and return a safe response
         current_app.logger.error(f"Error in index route: {str(e)}")
@@ -52,7 +83,7 @@ def index():
                 self.items = []
                 self.page = 1
                 self.pages = 1
-                self.per_page = 10
+                self.per_page = 6
                 self.total = 0
                 self.has_prev = False
                 self.has_next = False
@@ -64,9 +95,16 @@ def index():
         
         contests = MockPagination()
         
+        active_leagues = MockPagination()
+        
         return render_template('index.html', 
                              contests=contests, 
-                             current_user=current_user)
+                             current_user=current_user,
+                             featured_leagues=[],
+                             active_leagues=active_leagues,
+                             ai_contests=[],
+                             total_ai_contests=0,
+                             remaining_ai_contests=0)
 
 
 @main.route('/about')

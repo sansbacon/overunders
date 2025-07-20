@@ -11,7 +11,7 @@ from datetime import datetime
 
 # revision identifiers, used by Alembic.
 revision = 'add_league_tables'
-down_revision = 'c43685dc2f29_add_is_ai_generated_field_to_contest_'
+down_revision = 'c43685dc2f29'
 branch_labels = None
 depends_on = None
 

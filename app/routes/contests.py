@@ -10,6 +10,7 @@ from app.utils.decorators import login_required, contest_owner_required, get_cur
 from app.utils.timezone import get_timezone_choices, convert_to_utc, convert_from_utc, get_user_timezone
 from app.utils.invitations import send_bulk_invitations
 from app.utils.ai_generation import generate_nfl_contest, generate_contest_name_and_description, get_suggested_lock_time, ContestGenerationError
+from app.utils.verification_checks import VerificationChecker, VerificationDecorator
 
 contests = Blueprint('contests', __name__)
 
@@ -142,6 +143,13 @@ def create_contest():
     Returns:
         Rendered template for contest creation or redirect after creation
     """
+    # Check verification requirements
+    current_user = get_current_user()
+    can_create, reason = VerificationChecker.can_create_contest(current_user.user_id)
+    if not can_create:
+        flash(reason, 'warning')
+        return redirect(url_for('verification.request_verification'))
+    
     form = ContestForm()
     
     # Check for AI-generated data in session
@@ -379,6 +387,15 @@ def enter_contest(contest_id):
     """
     contest = Contest.query.get_or_404(contest_id)
     current_user = get_current_user()
+    
+    # Check verification requirements for participation
+    can_participate, reason = VerificationChecker.can_participate_in_contest(current_user.user_id, contest_id)
+    if not can_participate:
+        flash(reason, 'warning')
+        if 'verification' in reason.lower():
+            return redirect(url_for('verification.request_verification'))
+        else:
+            return redirect(url_for('contests.view_contest', contest_id=contest_id))
     
     # Check if contest is locked
     if contest.is_locked():
