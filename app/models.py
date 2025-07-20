@@ -7,6 +7,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 
 
+
 class User(db.Model):
     """User model for storing user account information."""
     
@@ -38,7 +39,7 @@ class User(db.Model):
     suspension_reason = db.Column(db.Text, nullable=True)  # Reason for suspension
     
     # Relationships
-    contests = db.relationship('Contest', backref='creator', lazy='dynamic')
+    contests = db.relationship('Contest', backref='creator', lazy='dynamic', foreign_keys='Contest.created_by_user')
     entries = db.relationship('ContestEntry', backref='user', lazy='dynamic')
     
     def __repr__(self) -> str:
@@ -644,6 +645,26 @@ class League(db.Model):
         league_contests = self.league_contests.order_by(LeagueContest.contest_order).all()
         return [lc.contest for lc in league_contests]
     
+    def get_draft_contests(self) -> List['DraftContest']:
+        """Get all draft contests in this league ordered by contest_order.
+        
+        Returns:
+            List[DraftContest]: List of draft contests in the league
+        """
+        league_draft_contests = self.league_draft_contests.order_by(LeagueDraftContest.contest_order).all()
+        return [ldc.draft_contest for ldc in league_draft_contests]
+    
+    def get_all_contests(self) -> dict:
+        """Get all contests (both regular and draft) in this league.
+        
+        Returns:
+            dict: Dictionary with 'contests' and 'draft_contests' keys
+        """
+        return {
+            'contests': self.get_contests(),
+            'draft_contests': self.get_draft_contests()
+        }
+    
     def get_contest_count(self) -> int:
         """Get count of contests in this league.
         
@@ -651,6 +672,22 @@ class League(db.Model):
             int: Number of contests in the league
         """
         return self.league_contests.count()
+    
+    def get_draft_contest_count(self) -> int:
+        """Get count of draft contests in this league.
+        
+        Returns:
+            int: Number of draft contests in the league
+        """
+        return self.league_draft_contests.count()
+    
+    def get_total_contest_count(self) -> int:
+        """Get total count of all contests (regular + draft) in this league.
+        
+        Returns:
+            int: Total number of contests in the league
+        """
+        return self.get_contest_count() + self.get_draft_contest_count()
     
     def get_leaderboard(self) -> List[dict]:
         """Get overall league leaderboard combining all contest results.
@@ -745,6 +782,42 @@ class League(db.Model):
         league_contest = self.league_contests.filter_by(contest_id=contest.contest_id).first()
         if league_contest:
             db.session.delete(league_contest)
+            return True
+        return False
+    
+    def add_draft_contest(self, draft_contest: 'DraftContest') -> 'LeagueDraftContest':
+        """Add a draft contest to this league.
+        
+        Args:
+            draft_contest (DraftContest): Draft contest to add
+            
+        Returns:
+            LeagueDraftContest: The created league draft contest relationship
+        """
+        # Get the next order number
+        max_order = db.session.query(db.func.max(LeagueDraftContest.contest_order))\
+                             .filter_by(league_id=self.league_id).scalar() or 0
+        
+        league_draft_contest = LeagueDraftContest(
+            league_id=self.league_id,
+            draft_contest_id=draft_contest.draft_contest_id,
+            contest_order=max_order + 1
+        )
+        db.session.add(league_draft_contest)
+        return league_draft_contest
+    
+    def remove_draft_contest(self, draft_contest: 'DraftContest') -> bool:
+        """Remove a draft contest from this league.
+        
+        Args:
+            draft_contest (DraftContest): Draft contest to remove
+            
+        Returns:
+            bool: True if draft contest was removed, False if not found
+        """
+        league_draft_contest = self.league_draft_contests.filter_by(draft_contest_id=draft_contest.draft_contest_id).first()
+        if league_draft_contest:
+            db.session.delete(league_draft_contest)
             return True
         return False
 
@@ -1336,3 +1409,464 @@ class ReputationHistory(db.Model):
             )
             db.session.add(history_entry)
             db.session.commit()
+
+
+# Draft Contest Models
+
+class DraftPool(db.Model):
+    """Draft pool model for storing collections of draftable items."""
+    
+    __tablename__ = 'draft_pools'
+    
+    draft_pool_id = db.Column(db.Integer, primary_key=True)
+    pool_name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    sport = db.Column(db.String(50), nullable=True)  # e.g., 'NFL', 'NBA', 'Stocks'
+    season = db.Column(db.String(50), nullable=True)  # e.g., '2024', '2024-25'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    items = db.relationship('DraftItem', backref='pool', lazy='dynamic', cascade='all, delete-orphan')
+    draft_contests = db.relationship('DraftContest', backref='pool', lazy='dynamic')
+    
+    def __repr__(self) -> str:
+        """String representation of DraftPool."""
+        return f'<DraftPool {self.pool_name}>'
+    
+    def get_available_items(self) -> List['DraftItem']:
+        """Get all available (undrafted) items in this pool.
+        
+        Returns:
+            List[DraftItem]: List of available items
+        """
+        return self.items.filter_by(is_available=True).order_by(DraftItem.item_order).all()
+    
+    def get_items_count(self) -> int:
+        """Get total number of items in this pool.
+        
+        Returns:
+            int: Total item count
+        """
+        return self.items.count()
+    
+    def get_available_count(self) -> int:
+        """Get number of available items in this pool.
+        
+        Returns:
+            int: Available item count
+        """
+        return self.items.filter_by(is_available=True).count()
+
+
+class DraftItem(db.Model):
+    """Draft item model for individual draftable items."""
+    
+    __tablename__ = 'draft_items'
+    
+    draft_item_id = db.Column(db.Integer, primary_key=True)
+    draft_pool_id = db.Column(db.Integer, db.ForeignKey('draft_pools.draft_pool_id'), nullable=False)
+    item_name = db.Column(db.String(200), nullable=False)
+    thumbnail_url = db.Column(db.String(500), nullable=True)
+    item_metadata = db.Column(db.JSON, nullable=True)  # Flexible metadata storage
+    item_order = db.Column(db.Integer, default=1, nullable=False)  # Display order
+    is_available = db.Column(db.Boolean, default=True, nullable=False)  # Available for drafting
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    picks = db.relationship('DraftPick', backref='item', lazy='dynamic')
+    scores = db.relationship('DraftItemScore', backref='item', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __repr__(self) -> str:
+        """String representation of DraftItem."""
+        return f'<DraftItem {self.item_name}>'
+    
+    def is_drafted(self) -> bool:
+        """Check if this item has been drafted.
+        
+        Returns:
+            bool: True if item has been drafted
+        """
+        return self.picks.count() > 0
+    
+    def get_drafted_by(self) -> Optional['DraftEntry']:
+        """Get the draft entry that picked this item.
+        
+        Returns:
+            Optional[DraftEntry]: Draft entry that picked this item, or None
+        """
+        pick = self.picks.first()
+        return pick.entry if pick else None
+    
+    def get_total_score(self, contest_id: int = None) -> float:
+        """Get total score for this item across all categories.
+        
+        Args:
+            contest_id (int, optional): Filter scores for specific contest
+            
+        Returns:
+            float: Total score
+        """
+        scores_query = self.scores
+        if contest_id:
+            # Filter by contest's scoring rules
+            scoring_rules = DraftScoringRule.query.filter_by(
+                draft_contest_id=contest_id,
+                is_active=True
+            ).all()
+            categories = [rule.category for rule in scoring_rules]
+            scores_query = scores_query.filter(DraftItemScore.score_category.in_(categories))
+        
+        total = 0.0
+        for score in scores_query.all():
+            # Find the scoring rule for this category
+            if contest_id:
+                rule = next((r for r in scoring_rules if r.category == score.score_category), None)
+                if rule and rule.points_per_unit:
+                    total += score.score_value * rule.points_per_unit
+                else:
+                    total += score.score_value
+            else:
+                total += score.score_value
+        
+        return total
+
+
+class DraftContest(db.Model):
+    """Draft contest model for storing draft contest information."""
+    
+    __tablename__ = 'draft_contests'
+    
+    draft_contest_id = db.Column(db.Integer, primary_key=True)
+    contest_name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_by_user = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    draft_pool_id = db.Column(db.Integer, db.ForeignKey('draft_pools.draft_pool_id'), nullable=False)
+    
+    # Timing
+    lock_timestamp = db.Column(db.DateTime, nullable=False)  # When entries close
+    draft_start_time = db.Column(db.DateTime, nullable=True)  # When drafting begins
+    draft_end_time = db.Column(db.DateTime, nullable=True)  # When drafting ends
+    
+    # Draft settings
+    picks_per_user = db.Column(db.Integer, default=5, nullable=False)
+    draft_order_type = db.Column(db.String(20), default='random', nullable=False)  # 'random', 'manual', 'league_standings'
+    is_snake_draft = db.Column(db.Boolean, default=True, nullable=False)  # Snake vs linear draft
+    
+    # Draft state
+    current_pick_number = db.Column(db.Integer, default=1, nullable=False)
+    current_round = db.Column(db.Integer, default=1, nullable=False)
+    draft_status = db.Column(db.String(20), default='pending', nullable=False)  # 'pending', 'active', 'completed'
+    
+    # General
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    creator = db.relationship('User', backref='created_draft_contests', foreign_keys=[created_by_user])
+    entries = db.relationship('DraftEntry', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
+    picks = db.relationship('DraftPick', 
+                           primaryjoin='DraftContest.draft_contest_id == DraftEntry.draft_contest_id',
+                           secondary='join(DraftEntry, DraftPick, DraftEntry.draft_entry_id == DraftPick.draft_entry_id)',
+                           secondaryjoin='DraftEntry.draft_entry_id == DraftPick.draft_entry_id',
+                           viewonly=True, lazy='dynamic')
+    scoring_rules = db.relationship('DraftScoringRule', backref='contest', lazy='dynamic', cascade='all, delete-orphan')
+    league_contests = db.relationship('LeagueDraftContest', backref='draft_contest', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def __repr__(self) -> str:
+        """String representation of DraftContest."""
+        return f'<DraftContest {self.contest_name}>'
+    
+    def is_locked(self) -> bool:
+        """Check if contest is locked for new entries.
+        
+        Returns:
+            bool: True if contest is locked
+        """
+        return datetime.utcnow() > self.lock_timestamp
+    
+    def can_start_draft(self) -> bool:
+        """Check if draft can be started.
+        
+        Returns:
+            bool: True if draft can start
+        """
+        return (self.is_locked() and 
+                self.entries.count() >= 2 and 
+                self.draft_status == 'pending')
+    
+    def get_entry_count(self) -> int:
+        """Get number of entries in this contest.
+        
+        Returns:
+            int: Number of entries
+        """
+        return self.entries.count()
+    
+    def get_entries_ordered(self) -> List['DraftEntry']:
+        """Get entries ordered by draft position.
+        
+        Returns:
+            List[DraftEntry]: Ordered list of entries
+        """
+        return self.entries.order_by(DraftEntry.draft_position).all()
+    
+    def get_current_drafter(self) -> Optional['DraftEntry']:
+        """Get the entry that should pick next.
+        
+        Returns:
+            Optional[DraftEntry]: Entry that should pick next, or None if draft is complete
+        """
+        if self.draft_status != 'active':
+            return None
+        
+        entries = self.get_entries_ordered()
+        if not entries:
+            return None
+        
+        total_entries = len(entries)
+        
+        if self.is_snake_draft:
+            # Snake draft logic
+            if self.current_round % 2 == 1:  # Odd rounds: 1, 2, 3, ...
+                position = ((self.current_pick_number - 1) % total_entries) + 1
+            else:  # Even rounds: ..., 3, 2, 1
+                position = total_entries - ((self.current_pick_number - 1) % total_entries)
+        else:
+            # Linear draft logic
+            position = ((self.current_pick_number - 1) % total_entries) + 1
+        
+        return next((entry for entry in entries if entry.draft_position == position), None)
+    
+    def advance_pick(self) -> None:
+        """Advance to the next pick."""
+        total_entries = self.get_entry_count()
+        total_picks = total_entries * self.picks_per_user
+        
+        if self.current_pick_number >= total_picks:
+            self.draft_status = 'completed'
+        else:
+            self.current_pick_number += 1
+            self.current_round = ((self.current_pick_number - 1) // total_entries) + 1
+    
+    def start_draft(self) -> bool:
+        """Start the draft by setting order and status.
+        
+        Returns:
+            bool: True if draft was started successfully
+        """
+        if not self.can_start_draft():
+            return False
+        
+        # Set draft order based on type
+        if self.draft_order_type == 'random':
+            self._set_random_draft_order()
+        elif self.draft_order_type == 'league_standings':
+            self._set_standings_draft_order()
+        # Manual order should already be set
+        
+        self.draft_status = 'active'
+        self.draft_start_time = datetime.utcnow()
+        return True
+    
+    def _set_random_draft_order(self) -> None:
+        """Set random draft order for all entries."""
+        import random
+        entries = list(self.entries.all())
+        random.shuffle(entries)
+        for i, entry in enumerate(entries, 1):
+            entry.draft_position = i
+    
+    def _set_standings_draft_order(self) -> None:
+        """Set draft order based on league standings (worst to best)."""
+        # Find the league this contest belongs to
+        league_contest = self.league_contests.first()
+        if not league_contest:
+            # Fallback to random if not in a league
+            self._set_random_draft_order()
+            return
+        
+        league = league_contest.league
+        leaderboard = league.get_leaderboard()
+        
+        # Reverse order - worst team picks first
+        position = 1
+        for leader in reversed(leaderboard):
+            entry = self.entries.filter_by(user_id=leader['user'].user_id).first()
+            if entry:
+                entry.draft_position = position
+                position += 1
+        
+        # Handle any entries not in league standings (assign remaining positions)
+        unassigned_entries = self.entries.filter_by(draft_position=None).all()
+        for entry in unassigned_entries:
+            entry.draft_position = position
+            position += 1
+    
+    def get_leaderboard(self) -> List[dict]:
+        """Get leaderboard for this draft contest.
+        
+        Returns:
+            List[dict]: Leaderboard data with user info and scores
+        """
+        leaderboard = []
+        for entry in self.entries.all():
+            leaderboard.append({
+                'user': entry.user,
+                'entry': entry,
+                'total_score': entry.get_total_score(),
+                'picks_count': entry.picks.count(),
+                'picks': entry.get_picks_ordered()
+            })
+        
+        # Sort by total score (desc)
+        leaderboard.sort(key=lambda x: x['total_score'], reverse=True)
+        return leaderboard
+
+
+class DraftEntry(db.Model):
+    """Draft entry model for user participation in draft contests."""
+    
+    __tablename__ = 'draft_entries'
+    
+    draft_entry_id = db.Column(db.Integer, primary_key=True)
+    draft_contest_id = db.Column(db.Integer, db.ForeignKey('draft_contests.draft_contest_id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.user_id'), nullable=False)
+    draft_position = db.Column(db.Integer, nullable=True)  # Set when draft starts
+    total_score = db.Column(db.Float, default=0.0, nullable=False)  # Calculated score
+    joined_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Relationships
+    user = db.relationship('User', backref='draft_entries')
+    picks = db.relationship('DraftPick', backref='entry', lazy='dynamic', cascade='all, delete-orphan')
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('draft_contest_id', 'user_id', name='unique_user_draft_contest_entry'),)
+    
+    def __repr__(self) -> str:
+        """String representation of DraftEntry."""
+        return f'<DraftEntry {self.draft_entry_id}: User {self.user_id} in Draft {self.draft_contest_id}>'
+    
+    def get_picks_ordered(self) -> List['DraftPick']:
+        """Get picks ordered by pick number.
+        
+        Returns:
+            List[DraftPick]: Ordered list of picks
+        """
+        return self.picks.order_by(DraftPick.pick_number).all()
+    
+    def get_total_score(self) -> float:
+        """Calculate total score for this entry based on picks.
+        
+        Returns:
+            float: Total score
+        """
+        total = 0.0
+        for pick in self.picks.all():
+            total += pick.item.get_total_score(self.draft_contest_id)
+        return total
+    
+    def update_total_score(self) -> None:
+        """Update the cached total score."""
+        self.total_score = self.get_total_score()
+    
+    def can_pick_now(self) -> bool:
+        """Check if this entry can pick right now.
+        
+        Returns:
+            bool: True if it's this entry's turn to pick
+        """
+        current_drafter = self.contest.get_current_drafter()
+        return current_drafter and current_drafter.draft_entry_id == self.draft_entry_id
+    
+    def get_remaining_picks(self) -> int:
+        """Get number of remaining picks for this entry.
+        
+        Returns:
+            int: Number of remaining picks
+        """
+        return max(0, self.contest.picks_per_user - self.picks.count())
+
+
+class DraftPick(db.Model):
+    """Draft pick model for individual picks made during drafting."""
+    
+    __tablename__ = 'draft_picks'
+    
+    draft_pick_id = db.Column(db.Integer, primary_key=True)
+    draft_entry_id = db.Column(db.Integer, db.ForeignKey('draft_entries.draft_entry_id'), nullable=False)
+    draft_item_id = db.Column(db.Integer, db.ForeignKey('draft_items.draft_item_id'), nullable=False)
+    pick_number = db.Column(db.Integer, nullable=False)  # Overall pick number (1, 2, 3, ...)
+    pick_round = db.Column(db.Integer, nullable=False)  # Round number (1, 2, 3, ...)
+    picked_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Unique constraints
+    __table_args__ = (
+        db.UniqueConstraint('draft_entry_id', 'pick_number', name='unique_entry_pick_number'),
+        db.UniqueConstraint('draft_item_id', name='unique_draft_item'),  # Each item can only be picked once
+    )
+    
+    def __repr__(self) -> str:
+        """String representation of DraftPick."""
+        return f'<DraftPick {self.pick_number}: {self.item.item_name}>'
+
+
+class DraftScoringRule(db.Model):
+    """Draft scoring rule model for defining how items are scored."""
+    
+    __tablename__ = 'draft_scoring_rules'
+    
+    rule_id = db.Column(db.Integer, primary_key=True)
+    draft_contest_id = db.Column(db.Integer, db.ForeignKey('draft_contests.draft_contest_id'), nullable=False)
+    rule_name = db.Column(db.String(100), nullable=False)  # e.g., "Passing Yards"
+    rule_description = db.Column(db.Text, nullable=True)  # How this rule works
+    points_per_unit = db.Column(db.Float, default=1.0, nullable=False)  # e.g., 0.04 points per passing yard
+    category = db.Column(db.String(50), nullable=False)  # Links to DraftItemScore.score_category
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    def __repr__(self) -> str:
+        """String representation of DraftScoringRule."""
+        return f'<DraftScoringRule {self.rule_name}: {self.points_per_unit} pts per {self.category}>'
+
+
+class DraftItemScore(db.Model):
+    """Draft item score model for storing scores for draft items."""
+    
+    __tablename__ = 'draft_item_scores'
+    
+    score_id = db.Column(db.Integer, primary_key=True)
+    draft_item_id = db.Column(db.Integer, db.ForeignKey('draft_items.draft_item_id'), nullable=False)
+    score_value = db.Column(db.Float, nullable=False)  # The actual score/stat value
+    score_category = db.Column(db.String(50), nullable=False)  # e.g., 'points', 'yards', 'wins'
+    scoring_period = db.Column(db.String(50), nullable=True)  # e.g., 'week_1', 'season', 'playoffs'
+    notes = db.Column(db.Text, nullable=True)  # Optional notes about the score
+    scored_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    def __repr__(self) -> str:
+        """String representation of DraftItemScore."""
+        return f'<DraftItemScore {self.item.item_name}: {self.score_value} {self.score_category}>'
+
+
+class LeagueDraftContest(db.Model):
+    """League draft contest model for linking draft contests to leagues."""
+    
+    __tablename__ = 'league_draft_contests'
+    
+    league_draft_contest_id = db.Column(db.Integer, primary_key=True)
+    league_id = db.Column(db.Integer, db.ForeignKey('leagues.league_id'), nullable=False)
+    draft_contest_id = db.Column(db.Integer, db.ForeignKey('draft_contests.draft_contest_id'), nullable=False)
+    contest_order = db.Column(db.Integer, default=1, nullable=False)
+    added_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    league = db.relationship('League', backref='league_draft_contests')
+    
+    # Unique constraint
+    __table_args__ = (db.UniqueConstraint('league_id', 'draft_contest_id', name='unique_league_draft_contest'),)
+    
+    def __repr__(self) -> str:
+        """String representation of LeagueDraftContest."""
+        return f'<LeagueDraftContest {self.league_draft_contest_id}: Draft {self.draft_contest_id} in League {self.league_id}>'
